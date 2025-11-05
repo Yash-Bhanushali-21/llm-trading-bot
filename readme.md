@@ -56,13 +56,7 @@ It can analyze live market data, reason about entry/exit points, and place trade
 
 ## Architecture Overview
 
-[ Broker Layer ]
-↓
-[ Core Engine ]
-↓
-[ LLM Layer ]
-↓
-[ Indicator Engine ]
+[ Broker Layer ] ->[ Core Engine ] -> [ LLM Layer ] -> [ Indicator Engine ]
 
 ### **Layered System Design**
 
@@ -75,11 +69,11 @@ It can analyze live market data, reason about entry/exit points, and place trade
 
 ## Modes of Operation
 
-### DRY_RUN Mode**
+### **DRY_RUN Mode**
 - Simulated trades for safe testing.
 - Logs reasoning, confidence, and P&L.
 
-### LIVE Mode**
+### **LIVE Mode**
 - Direct broker connection.
 - Executes real trades with live capital and stop-loss control.
 
