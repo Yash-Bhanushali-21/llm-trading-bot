@@ -1,0 +1,136 @@
+# ───────────────────────────────
+# ⚙️  GENERAL SETTINGS
+# ───────────────────────────────
+mode: DRY_RUN          # DRY_RUN | LIVE
+poll_seconds: 120     # how often bot checks signals
+exchange: NSE
+
+# ───────────────────────────────
+# 📈  UNIVERSE SETTINGS
+# ───────────────────────────────
+universe_mode: STATIC   # STATIC | DYNAMIC
+
+# Static universe for quick testing
+universe_static:
+  - RELIANCE
+
+# Dynamic universe (auto filter)
+universe_dynamic:
+  top_n: 25
+  run_preopen: true
+  preopen_time: "09:05"      # build watchlist after pre-open
+  refresh_midday: "12:00"    # rebuild midday
+  candidate_list:
+    - RELIANCE
+    - TCS
+    - HDFCBANK
+    - INFY
+    - HCLTECH
+    - LT
+    - SBIN
+    - ICICIBANK
+    - AXISBANK
+    - KOTAKBANK
+    - ITC
+    - TATAMOTORS
+    - TITAN
+    - JSWSTEEL
+    - ULTRACEMCO
+    - BAJFINANCE
+    - HDFCLIFE
+    - BHARTIARTL
+    - ASIANPAINT
+    - MARUTI
+    - NESTLEIND
+    - SUNPHARMA
+    - DIVISLAB
+    - ONGC
+    - ADANIENT
+    - GRASIM
+    - LTIM
+    - POWERGRID
+    - COALINDIA
+    - HAL
+  filters:
+    min_price: 100
+    max_price: 5000
+    min_turnover_cr: 50
+    atr_pct_min: 1.0
+    atr_pct_max: 5.0
+    rsi_min: 40
+    rsi_max: 80
+    exclude_t2t: false
+  scoring:
+    weight_trend: 0.4
+    weight_rsi: 0.3
+    weight_turnover: 0.2
+    weight_volatility: 0.1
+
+# ───────────────────────────────
+# 💰  RISK MANAGEMENT
+# ───────────────────────────────
+qty:
+  default_buy: 1
+  default_sell: 1
+  per_symbol: {}
+
+risk:
+  max_daily_drawdown_pct: 2.0   # stop trading after this loss
+  per_trade_risk_pct: 1.0       # position size cap
+
+# ───────────────────────────────
+# 🛑  STOP-LOSS SETTINGS
+# ───────────────────────────────
+stop:
+  mode: ATR        # ATR | PCT
+  pct: 1.5         # if mode=PCT, stop = 1.5% below entry
+  atr_mult: 1.5    # if mode=ATR, stop = ATR * 1.5 below entry
+  trailing: true   # raise stop as price moves up
+  min_tick: 0.05   # round stop to nearest tick
+
+# ───────────────────────────────
+# 📊  INDICATORS
+# ───────────────────────────────
+indicators:
+  sma_windows: [20, 50, 200]
+  rsi_period: 14
+  bb_window: 20
+  bb_stddev: 2.0
+  atr_period: 14
+
+# ───────────────────────────────
+# 🧠  LLM DECISION ENGINE
+# ───────────────────────────────
+llm:
+  # choose provider: OPENAI | CLAUDE
+  provider: OPENAI
+
+  # model options:
+  # - for OpenAI: gpt-4o-mini, gpt-4-turbo, etc.
+  # - for Claude: claude-3.5-sonnet, claude-3-opus, claude-2.1, etc.
+  model: gpt-4o-mini
+
+  max_tokens: 300
+  temperature: 0.1
+
+  # system prompt — ensures the LLM outputs strict JSON
+  system: |
+    You are a disciplined equities trader. Analyze the indicators and output STRICT JSON only.
+    Avoid natural language. Only BUY, SELL or HOLD based on signals.
+    Respect stop-loss, avoid overtrading, and act conservatively on low confidence.
+
+  # schema for JSON output
+  schema: |
+    {
+      "action": "BUY|SELL|HOLD",
+      "reason": "string",
+      "confidence": 0.0_to_1.0,
+      "qty": "integer_optional"
+    }
+
+# ───────────────────────────────
+# 📦  LOGGING / FILES
+# ───────────────────────────────
+logs:
+  base_dir: logs
+  rotate_days: 5     # compress .txt logs older than 5 days
