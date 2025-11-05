@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"example.com/zerodha-llm-bot/internal/types"
+	"llm-trading-bot/internal/types"
 )
 
 type Params struct{ Mode, APIKey, AccessToken, Exchange string }

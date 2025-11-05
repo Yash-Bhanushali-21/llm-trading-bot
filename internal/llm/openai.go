@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"example.com/zerodha-llm-bot/internal/store"
-	"example.com/zerodha-llm-bot/internal/types"
+	"llm-trading-bot/internal/store"
+	"llm-trading-bot/internal/types"
 )
 
 type OpenAIDecider struct{ cfg *store.Config }

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"example.com/zerodha-llm-bot/internal/store"
-	"example.com/zerodha-llm-bot/internal/ta"
-	"example.com/zerodha-llm-bot/internal/tradelog"
-	"example.com/zerodha-llm-bot/internal/types"
+	"llm-trading-bot/internal/store"
+	"llm-trading-bot/internal/ta"
+	"llm-trading-bot/internal/tradelog"
+	"llm-trading-bot/internal/types"
 )
 
 type Broker interface {

@@ -1,4 +1,4 @@
-module example.com/zerodha-llm-bot
+module llm-trading-bot
 
 go 1.22
 

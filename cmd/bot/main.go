@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"example.com/zerodha-llm-bot/internal/broker"
-	"example.com/zerodha-llm-bot/internal/engine"
-	"example.com/zerodha-llm-bot/internal/eod"
-	"example.com/zerodha-llm-bot/internal/llm"
-	"example.com/zerodha-llm-bot/internal/store"
-	"example.com/zerodha-llm-bot/internal/tradelog"
-	"example.com/zerodha-llm-bot/internal/types"
+	"llm-trading-bot/internal/broker"
+	"llm-trading-bot/internal/engine"
+	"llm-trading-bot/internal/eod"
+	"llm-trading-bot/internal/llm"
+	"llm-trading-bot/internal/store"
+	"llm-trading-bot/internal/tradelog"
+	"llm-trading-bot/internal/types"
 
 	"github.com/joho/godotenv"
 )

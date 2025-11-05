@@ -1,6 +1,6 @@
 package llm
 
-import "example.com/zerodha-llm-bot/internal/types"
+import "llm-trading-bot/internal/types"
 
 // NoopDecider is a fallback decider used when no LLM (like OpenAI) is configured.
 type NoopDecider struct{}
