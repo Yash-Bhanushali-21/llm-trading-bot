@@ -1,6 +1,8 @@
 package store
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +46,23 @@ type Config struct {
 	} `yaml:"llm"`
 }
 
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c.Mode != "DRY_RUN" && c.Mode != "LIVE" {
+		return fmt.Errorf("invalid mode '%s': must be 'DRY_RUN' or 'LIVE'", c.Mode)
+	}
+	if len(c.UniverseStatic) == 0 {
+		return errors.New("universe_static cannot be empty")
+	}
+	if c.Risk.PerTradeRiskPct <= 0 || c.Risk.PerTradeRiskPct > 100 {
+		return fmt.Errorf("risk.per_trade_risk_pct must be between 0-100, got %.2f", c.Risk.PerTradeRiskPct)
+	}
+	if c.Stop.Mode != "FIXED" && c.Stop.Mode != "ATR" {
+		return fmt.Errorf("stop.mode must be 'FIXED' or 'ATR', got '%s'", c.Stop.Mode)
+	}
+	return nil
+}
+
 func LoadConfig(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -53,8 +72,16 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(b, &c); err != nil {
 		return nil, err
 	}
+
+	// Set defaults
 	if c.PollSeconds == 0 {
 		c.PollSeconds = 15
 	}
+
+	// Validate configuration
+	if err := c.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
+
 	return &c, nil
 }

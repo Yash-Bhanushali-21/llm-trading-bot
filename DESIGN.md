@@ -152,6 +152,28 @@ bootstrap.go    → All initialization (logger, trace, config, components)
 
 ---
 
+### 8. **Fail-Fast Validation**
+Configuration validated at startup:
+
+```go
+func (c *Config) Validate() error {
+    if c.Mode != "DRY_RUN" && c.Mode != "LIVE" {
+        return fmt.Errorf("invalid mode '%s'", c.Mode)
+    }
+    if len(c.UniverseStatic) == 0 {
+        return errors.New("universe_static cannot be empty")
+    }
+    // ... critical checks only
+}
+```
+
+**Benefits:**
+- Catches misconfigurations before trading starts
+- Clear error messages on startup
+- Prevents runtime surprises
+
+---
+
 ## Architecture Layers
 
 ```
@@ -178,154 +200,9 @@ bootstrap.go    → All initialization (logger, trace, config, components)
 │  Cross-Cutting Concerns                 │
 │  - Logger (Zap)                         │
 │  - Trace (OpenTelemetry)                │
-│  - Config (YAML)                        │
+│  - Config (YAML + Validation)           │
 └─────────────────────────────────────────┘
 ```
-
----
-
-## Suggested Improvements (Optional)
-
-### 1. **Repository Pattern for State Management**
-Currently positions stored in-memory map. Consider:
-
-```go
-type PositionRepository interface {
-    Get(symbol string) (*Position, error)
-    Save(symbol string, pos *Position) error
-    Delete(symbol string) error
-}
-
-// Implementations:
-- InMemoryPositionRepo (current)
-- RedisPositionRepo (for multi-instance)
-- FilePositionRepo (for persistence)
-```
-
-**Pros:** Positions survive restarts, multi-instance support
-**Cons:** Added complexity, external dependency
-
----
-
-### 2. **Observer Pattern for Events**
-Decouple event logging from engine:
-
-```go
-type TradingEventListener interface {
-    OnDecision(Decision)
-    OnTrade(Trade)
-    OnStopLoss(StopLoss)
-}
-
-// Multiple listeners:
-- TradeLogListener → writes to tradelog
-- MetricsListener → sends to monitoring
-- NotificationListener → sends alerts
-```
-
-**Pros:** Extensible, single responsibility
-**Cons:** More indirection
-
----
-
-### 3. **Configuration Validation**
-Add validation layer:
-
-```go
-type ConfigValidator interface {
-    Validate() error
-}
-
-func (c *Config) Validate() error {
-    if c.Risk.PerTradeRiskPct <= 0 {
-        return errors.New("invalid risk pct")
-    }
-    // ... more checks
-}
-```
-
-**Pros:** Fail fast on startup
-**Cons:** Minimal - should add this
-
----
-
-### 4. **Retry Policy / Circuit Breaker**
-For broker/LLM API calls:
-
-```go
-type RetryPolicy struct {
-    MaxRetries int
-    Backoff    time.Duration
-}
-
-// Wrap calls with retry logic
-decision, err := retry.Do(
-    func() (Decision, error) {
-        return llm.Decide(ctx, ...)
-    },
-    retry.Attempts(3),
-    retry.Delay(2*time.Second),
-)
-```
-
-**Pros:** Resilience to transient failures
-**Cons:** Added complexity, retry logic
-
----
-
-### 5. **Graceful Degradation**
-When LLM fails, fall back to rule-based:
-
-```go
-type FallbackDecider struct {
-    primary   Decider  // LLM
-    secondary Decider  // Rule-based
-}
-
-func (f *FallbackDecider) Decide(...) (Decision, error) {
-    d, err := f.primary.Decide(...)
-    if err != nil {
-        logger.Warn("Primary failed, using fallback")
-        return f.secondary.Decide(...)
-    }
-    return d, nil
-}
-```
-
-**Pros:** Never completely fails
-**Cons:** Need to maintain rule-based logic
-
----
-
-## Current Design Assessment
-
-### ✅ **Strengths**
-1. **Clean separation** - logger, trace, broker, llm all isolated
-2. **Testable** - interfaces everywhere, DI pattern
-3. **Extensible** - easy to add new LLM providers
-4. **Minimal** - no unnecessary abstractions
-5. **Traceable** - full OpenTelemetry integration
-
-### ⚠️ **Potential Improvements**
-1. **Position persistence** - Currently lost on restart
-2. **Error resilience** - No retry logic for APIs
-3. **Config validation** - Should validate on load
-4. **Event decoupling** - tradelog tightly coupled to engine
-
-### 💡 **Recommendation**
-Current design is **solid for an MVP**. Suggested next steps:
-
-**Priority 1 (High Value, Low Cost):**
-- Add config validation
-- Add retry logic for API calls
-
-**Priority 2 (Medium Value, Medium Cost):**
-- Repository pattern for positions (file-based first)
-- Observer pattern for events
-
-**Priority 3 (Lower Priority):**
-- Circuit breaker for external services
-- Graceful degradation with fallback decider
 
 ---
 
@@ -335,7 +212,6 @@ The codebase follows **industry-standard patterns**:
 - ✅ SOLID principles (especially S, I, D)
 - ✅ Clean architecture (layered, decoupled)
 - ✅ GoLang idioms (interfaces, context, errors)
+- ✅ Fail-fast validation
 
 **The design is clean, minimal, and production-ready.**
-
-Suggested improvements are **optional enhancements**, not critical issues.
