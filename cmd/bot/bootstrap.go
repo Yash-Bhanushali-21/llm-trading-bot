@@ -1,0 +1,97 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/engine"
+	"llm-trading-bot/internal/llm/claude"
+	"llm-trading-bot/internal/llm/noop"
+	"llm-trading-bot/internal/llm/openai"
+	"llm-trading-bot/internal/logger"
+	"llm-trading-bot/internal/store"
+	"llm-trading-bot/internal/trace"
+	"llm-trading-bot/internal/tradelog"
+	"llm-trading-bot/internal/types"
+
+	"github.com/joho/godotenv"
+)
+
+// initializeSystem initializes logger and tracer
+func initializeSystem() error {
+	// Load environment variables
+	_ = godotenv.Load()
+
+	// Initialize logger
+	if err := logger.Init(); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+
+	// Initialize tracer
+	if err := trace.Init(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize tracer: %v\n", err)
+	}
+
+	return nil
+}
+
+// loadConfig loads and returns the configuration
+func loadConfig(ctx context.Context) (*store.Config, error) {
+	cfg, err := store.LoadConfig("config.yaml")
+	if err != nil {
+		logger.ErrorWithErr(ctx, "Failed to load config", err)
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// compressOldLogs compresses old tradelog files if retention is configured
+func compressOldLogs(ctx context.Context) {
+	if v := os.Getenv("TRADER_LOG_RETENTION_DAYS"); v != "" {
+		var n int
+		fmt.Sscanf(v, "%d", &n)
+		if err := tradelog.CompressOlder(n); err != nil {
+			logger.Warn(ctx, "Failed to compress old logs", "error", err)
+		}
+	}
+}
+
+// initializeBroker initializes and returns the broker instance
+func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
+	brk := zerodha.NewZerodha(zerodha.Params{
+		Mode:        cfg.Mode,
+		APIKey:      os.Getenv("KITE_API_KEY"),
+		AccessToken: os.Getenv("KITE_ACCESS_TOKEN"),
+		Exchange:    cfg.Exchange,
+	})
+
+	if cfg.Mode == "DRY_RUN" {
+		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
+	}
+
+	return brk
+}
+
+// initializeDecider initializes and returns the LLM decider
+func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
+	var decider types.Decider
+
+	switch cfg.LLM.Provider {
+	case "OPENAI":
+		decider = openai.NewOpenAIDecider(cfg)
+	case "CLAUDE":
+		decider = claude.NewClaudeDecider(cfg)
+	default:
+		decider = noop.NewNoopDecider()
+		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
+	}
+
+	return decider
+}
+
+// initializeEngine initializes and returns the trading engine
+func initializeEngine(cfg *store.Config, brk zerodha.Broker, decider types.Decider) engine.IEngine {
+	return engine.New(cfg, brk, decider)
+}
