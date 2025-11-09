@@ -14,6 +14,7 @@ import (
 	"llm-trading-bot/internal/engine"
 	"llm-trading-bot/internal/eod"
 	"llm-trading-bot/internal/llm"
+	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/tradelog"
 	"llm-trading-bot/internal/types"
@@ -21,76 +22,177 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func must(err error) {
+func must(ctx context.Context, err error) {
 	if err != nil {
+		logger.ErrorWithErr(ctx, "Fatal error", err)
 		log.Fatal(err)
 	}
 }
 
 func main() {
+	// Load environment variables
 	_ = godotenv.Load()
-	cfg, err := store.LoadConfig("config.yaml")
-	must(err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// Initialize logger first
+	if err := logger.Init(); err != nil {
+		log.Fatal("Failed to initialize logger:", err)
+	}
+
+	// Create root context with tracing span for the entire session
+	ctx := context.Background()
+	ctx, mainSpan := logger.StartSpan(ctx, "trading-bot-session")
+	defer mainSpan.End()
+
+	logger.Info(ctx, "=== LLM Trading Bot Starting ===")
+
+	// Ensure graceful shutdown of tracer
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := logger.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
+	// Load configuration
+	logger.Debug(ctx, "Loading configuration from config.yaml")
+	cfg, err := store.LoadConfig("config.yaml")
+	must(ctx, err)
+	logger.Info(ctx, "Configuration loaded successfully",
+		"mode", cfg.Mode,
+		"exchange", cfg.Exchange,
+		"poll_seconds", cfg.PollSeconds,
+		"symbols_count", len(cfg.UniverseStatic),
+		"llm_provider", cfg.LLM.Provider,
+	)
+
+	// Setup cancellation context
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Compress old logs if retention is configured
 	if v := os.Getenv("TRADER_LOG_RETENTION_DAYS"); v != "" {
 		var n int
 		fmt.Sscanf(v, "%d", &n)
-		_ = tradelog.CompressOlder(n)
+		logger.Debug(ctx, "Compressing old trade logs", "retention_days", n)
+		if err := tradelog.CompressOlder(n); err != nil {
+			logger.Warn(ctx, "Failed to compress old logs", "error", err)
+		} else {
+			logger.Debug(ctx, "Old logs compressed successfully")
+		}
 	}
 
+	// Setup signal handling for graceful shutdown
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	logger.Debug(ctx, "Signal handlers registered")
 
+	// Initialize broker
+	logger.Info(ctx, "Initializing broker", "broker", "zerodha", "mode", cfg.Mode)
 	brk := broker.NewZerodha(cpf(cfg))
 	if cfg.Mode == "DRY_RUN" {
-		log.Println(">> DRY_RUN mode")
+		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
+	} else {
+		logger.Info(ctx, "Running in LIVE mode - real orders will be placed")
 	}
 
+	// Initialize LLM decider
 	var decider types.Decider
+	logger.Info(ctx, "Initializing LLM decider", "provider", cfg.LLM.Provider)
 	if cfg.LLM.Provider == "OPENAI" {
 		decider = llm.NewOpenAIDecider(cfg)
+		logger.Info(ctx, "OpenAI decider initialized", "model", cfg.LLM.Model)
+	} else if cfg.LLM.Provider == "CLAUDE" {
+		decider = llm.NewClaudeDecider(cfg)
+		logger.Info(ctx, "Claude decider initialized", "model", cfg.LLM.Model)
 	} else {
 		decider = llm.NewNoopDecider()
+		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
 	}
 
+	// Initialize trading engine
+	logger.Info(ctx, "Initializing trading engine")
 	eng := engine.New(cfg, brk, decider)
 
+	// Setup tickers
 	tick := time.NewTicker(time.Duration(cfg.PollSeconds) * time.Second)
 	defer tick.Stop()
 	eodTick := time.NewTicker(60 * time.Second)
 	defer eodTick.Stop()
 
-	log.Println("Bot started.")
+	logger.Info(ctx, "Bot started - entering main loop",
+		"poll_interval_seconds", cfg.PollSeconds,
+		"symbols", cfg.UniverseStatic,
+	)
+
+	// Main event loop
 	for {
 		select {
 		case <-tick.C:
+			// Create a new span for this tick
+			tickCtx, tickSpan := logger.StartSpan(ctx, "tick-processing")
+			logger.Debug(tickCtx, "Tick - processing symbols", "count", len(cfg.UniverseStatic))
+
 			for _, sym := range cfg.UniverseStatic {
-				st, err := eng.Step(ctx, sym)
+				// Create symbol-specific span
+				symCtx, symSpan := logger.StartSpan(tickCtx, "process-symbol")
+				logger.Debug(symCtx, "Processing symbol", "symbol", sym)
+
+				timer := logger.StartOperation(symCtx, "symbol_processing", "symbol", sym)
+				st, err := eng.Step(timer.GetContext(), sym)
 				if err != nil {
-					log.Printf("[%s] step error: %v", sym, err)
+					timer.EndWithError(err)
+					logger.ErrorWithErr(symCtx, "Symbol processing failed", err, "symbol", sym)
+					symSpan.End()
 					continue
 				}
+				timer.End("status", "success")
+
 				if st != nil {
-					b, _ := json.Marshal(st)
-					fmt.Println(string(b))
+					logger.Debug(symCtx, "Symbol state updated", "symbol", sym, "state", st)
+					if logger.IsDebugEnabled() {
+						b, _ := json.Marshal(st)
+						fmt.Println(string(b))
+					}
 				}
+				symSpan.End()
 			}
+			tickSpan.End()
+
 		case <-eodTick.C:
+			eodCtx, eodSpan := logger.StartSpan(ctx, "eod-check")
+			logger.Debug(eodCtx, "Checking if EOD summary should run")
 			if ok, _ := eod.ShouldRunNow(); ok {
+				logger.Info(eodCtx, "Running end-of-day summary")
+				timer := logger.StartOperation(eodCtx, "eod_summary")
 				if p, err := eod.SummarizeToday(); err == nil && p != "" {
-					log.Println("EOD CSV written:", p)
+					timer.End("path", p)
+					logger.Info(eodCtx, "EOD CSV written successfully", "path", p)
+				} else if err != nil {
+					timer.EndWithError(err)
+					logger.ErrorWithErr(eodCtx, "Failed to write EOD CSV", err)
 				}
 			}
+			eodSpan.End()
+
 		case <-sigc:
-			log.Println("Shutting down...")
+			shutdownCtx, shutdownSpan := logger.StartSpan(ctx, "graceful-shutdown")
+			logger.Info(shutdownCtx, "Shutdown signal received - gracefully shutting down")
+
+			// Generate final EOD summary
+			logger.Info(shutdownCtx, "Generating final end-of-day summary")
 			if p, err := eod.SummarizeToday(); err == nil && p != "" {
-				log.Println("EOD CSV written:", p)
+				logger.Info(shutdownCtx, "Final EOD CSV written", "path", p)
+			} else if err != nil {
+				logger.ErrorWithErr(shutdownCtx, "Failed to write final EOD CSV", err)
 			}
+
+			logger.Info(shutdownCtx, "=== LLM Trading Bot Shutdown Complete ===")
+			shutdownSpan.End()
 			return
+
 		case <-ctx.Done():
+			logger.Info(ctx, "Context cancelled - exiting")
 			return
 		}
 	}
