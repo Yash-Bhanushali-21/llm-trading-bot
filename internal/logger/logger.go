@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -66,10 +65,9 @@ func InitWithConfig(config LogConfig) error {
 	tracingEnabled = config.TracingEnabled
 
 	// Create handler options
-	// Note: We manually add source information in logWithTrace to get correct caller location
 	opts := &slog.HandlerOptions{
 		Level:     logLevel,
-		AddSource: false, // We manually add source to get correct caller location
+		AddSource: detailedLogging, // Add source file and line number if detailed logging is enabled
 	}
 
 	var handler slog.Handler
@@ -192,22 +190,22 @@ func Debug(ctx context.Context, msg string, args ...any) {
 	if !detailedLogging {
 		return
 	}
-	logWithTrace(ctx, slog.LevelDebug, msg, 2, args...)
+	logWithTrace(ctx, slog.LevelDebug, msg, args...)
 }
 
 // Info logs an info message
 func Info(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelInfo, msg, 2, args...)
+	logWithTrace(ctx, slog.LevelInfo, msg, args...)
 }
 
 // Warn logs a warning message
 func Warn(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelWarn, msg, 2, args...)
+	logWithTrace(ctx, slog.LevelWarn, msg, args...)
 }
 
 // Error logs an error message
 func Error(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelError, msg, 2, args...)
+	logWithTrace(ctx, slog.LevelError, msg, args...)
 }
 
 // ErrorWithErr logs an error message with an error object
@@ -222,32 +220,14 @@ func ErrorWithErr(ctx context.Context, msg string, err error, args ...any) {
 	}
 
 	allArgs := append([]any{"error", err}, args...)
-	logWithTrace(ctx, slog.LevelError, msg, 2, allArgs...)
+	logWithTrace(ctx, slog.LevelError, msg, allArgs...)
 }
 
 // logWithTrace logs a message with trace ID and span ID if available
-// skip parameter indicates how many stack frames to skip to get the actual caller
-func logWithTrace(ctx context.Context, level slog.Level, msg string, skip int, args ...any) {
+func logWithTrace(ctx context.Context, level slog.Level, msg string, args ...any) {
 	if traceAttrs := getTraceAttrs(ctx); traceAttrs != nil {
 		args = append(traceAttrs, args...)
 	}
-
-	// Add source information if detailed logging is enabled
-	if detailedLogging {
-		// Skip frames: runtime.Caller -> logWithTrace -> wrapper (Debug/Info/etc) -> actual caller
-		// So we need to skip 'skip' frames to get to the actual caller
-		if pc, file, line, ok := runtime.Caller(skip); ok {
-			fn := runtime.FuncForPC(pc)
-			if fn != nil {
-				args = append(args, "source", slog.GroupValue(
-					slog.String("function", fn.Name()),
-					slog.String("file", file),
-					slog.Int("line", line),
-				))
-			}
-		}
-	}
-
 	globalLogger.Log(ctx, level, msg, args...)
 }
 
@@ -371,7 +351,7 @@ func Decision(ctx context.Context, symbol, action string, confidence float64, re
 		"confidence", confidence,
 		"reason", reason,
 	}, fields...)
-	logWithTrace(ctx, slog.LevelInfo, "Trading decision made", 2, allFields...)
+	logWithTrace(ctx, slog.LevelInfo, "Trading decision made", allFields...)
 }
 
 // Trade logs a trade execution (always logged regardless of level)
@@ -397,7 +377,7 @@ func Trade(ctx context.Context, symbol, side string, qty int, price float64, ord
 		"price", price,
 		"order_id", orderID,
 	}, fields...)
-	logWithTrace(ctx, slog.LevelInfo, "Trade executed", 2, allFields...)
+	logWithTrace(ctx, slog.LevelInfo, "Trade executed", allFields...)
 }
 
 // Risk logs a risk management event
@@ -417,7 +397,7 @@ func Risk(ctx context.Context, symbol, eventType string, fields ...any) {
 		"symbol", symbol,
 		"event_type", eventType,
 	}, fields...)
-	logWithTrace(ctx, slog.LevelWarn, "Risk event", 2, allFields...)
+	logWithTrace(ctx, slog.LevelWarn, "Risk event", allFields...)
 }
 
 // IsDebugEnabled returns whether debug logging is enabled
