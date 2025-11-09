@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -15,13 +14,17 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
 	// Global logger instance
-	globalLogger *slog.Logger
+	globalLogger *zap.Logger
+	// Sugar logger for convenience
+	sugarLogger *zap.SugaredLogger
 	// Log level controlled by environment variable
-	logLevel slog.Level
+	logLevel zapcore.Level
 	// Whether detailed logging is enabled
 	detailedLogging bool
 	// Whether tracing is enabled
@@ -64,26 +67,42 @@ func InitWithConfig(config LogConfig) error {
 	detailedLogging = config.DetailedLogging
 	tracingEnabled = config.TracingEnabled
 
-	// Create handler options
-	opts := &slog.HandlerOptions{
-		Level:     logLevel,
-		AddSource: detailedLogging, // Add source file and line number if detailed logging is enabled
-	}
+	// Create encoder config
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.TimeKey = "time"
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 
-	var handler slog.Handler
+	// Create encoder
+	var encoder zapcore.Encoder
 	if config.Format == "json" {
-		handler = slog.NewJSONHandler(os.Stdout, opts)
+		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	} else {
-		handler = slog.NewTextHandler(os.Stdout, opts)
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
-	globalLogger = slog.New(handler)
-	slog.SetDefault(globalLogger)
+	// Create core
+	core := zapcore.NewCore(
+		encoder,
+		zapcore.AddSync(os.Stdout),
+		logLevel,
+	)
+
+	// Create logger with caller skip and source info if detailed logging enabled
+	opts := []zap.Option{
+		zap.AddCallerSkip(1), // Skip wrapper functions
+	}
+	if detailedLogging {
+		opts = append(opts, zap.AddCaller())
+	}
+
+	globalLogger = zap.New(core, opts...)
+	sugarLogger = globalLogger.Sugar()
 
 	// Initialize OpenTelemetry tracer if tracing is enabled
 	if tracingEnabled {
 		if err := initTracer(); err != nil {
-			globalLogger.Warn("Failed to initialize OpenTelemetry tracer, tracing disabled", "error", err)
+			sugarLogger.Warnw("Failed to initialize OpenTelemetry tracer, tracing disabled", "error", err)
 			tracingEnabled = false
 		}
 	}
@@ -136,19 +155,19 @@ func Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// parseLogLevel converts string log level to slog.Level
-func parseLogLevel(level string) slog.Level {
+// parseLogLevel converts string log level to zapcore.Level
+func parseLogLevel(level string) zapcore.Level {
 	switch strings.ToUpper(level) {
 	case "DEBUG":
-		return slog.LevelDebug
+		return zapcore.DebugLevel
 	case "INFO":
-		return slog.LevelInfo
+		return zapcore.InfoLevel
 	case "WARN":
-		return slog.LevelWarn
+		return zapcore.WarnLevel
 	case "ERROR":
-		return slog.LevelError
+		return zapcore.ErrorLevel
 	default:
-		return slog.LevelInfo
+		return zapcore.InfoLevel
 	}
 }
 
@@ -168,8 +187,8 @@ func StartSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOpti
 	return tracer.Start(ctx, spanName, opts...)
 }
 
-// getTraceAttrs extracts trace ID and span ID from context for logging
-func getTraceAttrs(ctx context.Context) []any {
+// getTraceFields extracts trace ID and span ID from context for logging
+func getTraceFields(ctx context.Context) []zap.Field {
 	if !tracingEnabled {
 		return nil
 	}
@@ -179,37 +198,38 @@ func getTraceAttrs(ctx context.Context) []any {
 		return nil
 	}
 
-	return []any{
-		"trace_id", span.SpanContext().TraceID().String(),
-		"span_id", span.SpanContext().SpanID().String(),
+	return []zap.Field{
+		zap.String("trace_id", span.SpanContext().TraceID().String()),
+		zap.String("span_id", span.SpanContext().SpanID().String()),
 	}
 }
 
-// Debug logs a debug message
-func Debug(ctx context.Context, msg string, args ...any) {
-	if !detailedLogging {
-		return
-	}
-	logWithTrace(ctx, slog.LevelDebug, msg, args...)
+// Debug logs a debug message with trace context
+func Debug(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Debugw(msg, keysAndValues...)
 }
 
-// Info logs an info message
-func Info(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelInfo, msg, args...)
+// Info logs an info message with trace context
+func Info(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Infow(msg, keysAndValues...)
 }
 
-// Warn logs a warning message
-func Warn(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelWarn, msg, args...)
+// Warn logs a warning message with trace context
+func Warn(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Warnw(msg, keysAndValues...)
 }
 
-// Error logs an error message
-func Error(ctx context.Context, msg string, args ...any) {
-	logWithTrace(ctx, slog.LevelError, msg, args...)
+// Error logs an error message with trace context
+func Error(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Errorw(msg, keysAndValues...)
 }
 
 // ErrorWithErr logs an error message with an error object
-func ErrorWithErr(ctx context.Context, msg string, err error, args ...any) {
+func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...interface{}) {
 	// Record error in span if present
 	if tracingEnabled {
 		span := trace.SpanFromContext(ctx)
@@ -219,16 +239,21 @@ func ErrorWithErr(ctx context.Context, msg string, err error, args ...any) {
 		}
 	}
 
-	allArgs := append([]any{"error", err}, args...)
-	logWithTrace(ctx, slog.LevelError, msg, allArgs...)
+	fields := getTraceFields(ctx)
+	allArgs := append([]interface{}{"error", err}, keysAndValues...)
+	sugarLogger.With(fieldsToInterface(fields)...).Errorw(msg, allArgs...)
 }
 
-// logWithTrace logs a message with trace ID and span ID if available
-func logWithTrace(ctx context.Context, level slog.Level, msg string, args ...any) {
-	if traceAttrs := getTraceAttrs(ctx); traceAttrs != nil {
-		args = append(traceAttrs, args...)
+// fieldsToInterface converts zap.Field slice to interface slice for SugaredLogger
+func fieldsToInterface(fields []zap.Field) []interface{} {
+	if len(fields) == 0 {
+		return nil
 	}
-	globalLogger.Log(ctx, level, msg, args...)
+	result := make([]interface{}, 0, len(fields)*2)
+	for _, f := range fields {
+		result = append(result, f.Key, f.String)
+	}
+	return result
 }
 
 // OperationTimer helps measure operation duration with OpenTelemetry spans
@@ -331,7 +356,7 @@ func (ot *OperationTimer) GetContext() context.Context {
 }
 
 // Decision logs a trading decision (always logged regardless of level)
-func Decision(ctx context.Context, symbol, action string, confidence float64, reason string, fields ...any) {
+func Decision(ctx context.Context, symbol, action string, confidence float64, reason string, keysAndValues ...interface{}) {
 	if tracingEnabled {
 		span := trace.SpanFromContext(ctx)
 		if span.SpanContext().IsValid() {
@@ -344,18 +369,20 @@ func Decision(ctx context.Context, symbol, action string, confidence float64, re
 		}
 	}
 
-	allFields := append([]any{
+	allFields := append([]interface{}{
 		"type", "DECISION",
 		"symbol", symbol,
 		"action", action,
 		"confidence", confidence,
 		"reason", reason,
-	}, fields...)
-	logWithTrace(ctx, slog.LevelInfo, "Trading decision made", allFields...)
+	}, keysAndValues...)
+
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Infow("Trading decision made", allFields...)
 }
 
 // Trade logs a trade execution (always logged regardless of level)
-func Trade(ctx context.Context, symbol, side string, qty int, price float64, orderID string, fields ...any) {
+func Trade(ctx context.Context, symbol, side string, qty int, price float64, orderID string, keysAndValues ...interface{}) {
 	if tracingEnabled {
 		span := trace.SpanFromContext(ctx)
 		if span.SpanContext().IsValid() {
@@ -369,19 +396,21 @@ func Trade(ctx context.Context, symbol, side string, qty int, price float64, ord
 		}
 	}
 
-	allFields := append([]any{
+	allFields := append([]interface{}{
 		"type", "TRADE",
 		"symbol", symbol,
 		"side", side,
 		"quantity", qty,
 		"price", price,
 		"order_id", orderID,
-	}, fields...)
-	logWithTrace(ctx, slog.LevelInfo, "Trade executed", allFields...)
+	}, keysAndValues...)
+
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Infow("Trade executed", allFields...)
 }
 
 // Risk logs a risk management event
-func Risk(ctx context.Context, symbol, eventType string, fields ...any) {
+func Risk(ctx context.Context, symbol, eventType string, keysAndValues ...interface{}) {
 	if tracingEnabled {
 		span := trace.SpanFromContext(ctx)
 		if span.SpanContext().IsValid() {
@@ -392,12 +421,14 @@ func Risk(ctx context.Context, symbol, eventType string, fields ...any) {
 		}
 	}
 
-	allFields := append([]any{
+	allFields := append([]interface{}{
 		"type", "RISK",
 		"symbol", symbol,
 		"event_type", eventType,
-	}, fields...)
-	logWithTrace(ctx, slog.LevelWarn, "Risk event", allFields...)
+	}, keysAndValues...)
+
+	fields := getTraceFields(ctx)
+	sugarLogger.With(fieldsToInterface(fields)...).Warnw("Risk event", allFields...)
 }
 
 // IsDebugEnabled returns whether debug logging is enabled
