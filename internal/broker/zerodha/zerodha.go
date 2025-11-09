@@ -1,4 +1,4 @@
-package broker
+package zerodha
 
 import (
 	"context"
@@ -11,17 +11,32 @@ import (
 	"llm-trading-bot/internal/types"
 )
 
-type Params struct{ Mode, APIKey, AccessToken, Exchange string }
-type Zerodha struct{ p Params }
+// Params holds configuration parameters for the Zerodha broker
+type Params struct {
+	Mode        string
+	APIKey      string
+	AccessToken string
+	Exchange    string
+}
 
-func NewZerodha(p Params) *Zerodha { return &Zerodha{p: p} }
+// Zerodha implements the Broker interface for Zerodha broker
+type Zerodha struct {
+	p Params
+}
 
+// NewZerodha creates a new Zerodha broker instance
+func NewZerodha(p Params) *Zerodha {
+	return &Zerodha{p: p}
+}
+
+// LTP returns the last traded price for a symbol
 func (z *Zerodha) LTP(ctx context.Context, symbol string) (float64, error) {
 	price := 1000 + rand.Float64()*100
 	logger.Debug(ctx, "Fetched LTP", "symbol", symbol, "price", price)
 	return price, nil
 }
 
+// RecentCandles fetches the last n candles for a symbol
 func (z *Zerodha) RecentCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error) {
 	logger.Debug(ctx, "Fetching recent candles", "symbol", symbol, "count", n, "mode", z.p.Mode)
 
@@ -39,6 +54,7 @@ func (z *Zerodha) RecentCandles(ctx context.Context, symbol string, n int) ([]ty
 	return cs, nil
 }
 
+// PlaceOrder places an order and returns the order response
 func (z *Zerodha) PlaceOrder(ctx context.Context, req types.OrderReq) (types.OrderResp, error) {
 	logger.Debug(ctx, "Placing order", "symbol", req.Symbol, "side", req.Side, "qty", req.Qty, "tag", req.Tag, "mode", z.p.Mode)
 

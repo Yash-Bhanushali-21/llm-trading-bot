@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"llm-trading-bot/internal/broker/zerodha"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/ta"
@@ -14,11 +15,6 @@ import (
 	"llm-trading-bot/internal/types"
 )
 
-type Broker interface {
-	LTP(ctx context.Context, symbol string) (float64, error)
-	RecentCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error)
-	PlaceOrder(ctx context.Context, req types.OrderReq) (types.OrderResp, error)
-}
 type position struct {
 	qty     int
 	avg     float64
@@ -27,14 +23,14 @@ type position struct {
 }
 type Engine struct {
 	cfg      *store.Config
-	brk      Broker
+	brk      zerodha.Broker
 	llm      types.Decider
 	pnl      float64
 	dayStart time.Time
 	pos      map[string]*position
 }
 
-func New(cfg *store.Config, brk Broker, d types.Decider) *Engine {
+func New(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
 	return &Engine{cfg: cfg, brk: brk, llm: d, dayStart: midnightIST(), pos: map[string]*position{}}
 }
 func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {

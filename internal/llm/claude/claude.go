@@ -1,4 +1,4 @@
-package llm
+package claude
 
 import (
 	"bytes"
@@ -17,12 +17,13 @@ import (
 	"llm-trading-bot/internal/types"
 )
 
-// ClaudeDecider calls Anthropic Claude Messages API and returns a types.Decision.
+// ClaudeDecider implements the Decider interface using Anthropic Claude API
 type ClaudeDecider struct {
 	cfg      *store.Config
 	endpoint string
 }
 
+// NewClaudeDecider creates a new Claude-based decider
 func NewClaudeDecider(cfg *store.Config) *ClaudeDecider {
 	// default messages endpoint (public Anthropic)
 	endpoint := "https://api.anthropic.com/v1/messages"
@@ -33,6 +34,7 @@ func NewClaudeDecider(cfg *store.Config) *ClaudeDecider {
 	return &ClaudeDecider{cfg: cfg, endpoint: endpoint}
 }
 
+// Decide makes a trading decision using Claude's API
 func (d *ClaudeDecider) Decide(ctx context.Context, symbol string, latest types.Candle, inds types.Indicators, ctxmap map[string]any) (types.Decision, error) {
 	logger.Debug(ctx, "Claude decider called", "symbol", symbol, "model", d.cfg.LLM.Model, "endpoint", d.endpoint)
 

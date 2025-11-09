@@ -1,4 +1,4 @@
-package llm
+package openai
 
 import (
 	"bytes"
@@ -16,10 +16,17 @@ import (
 	"llm-trading-bot/internal/types"
 )
 
-type OpenAIDecider struct{ cfg *store.Config }
+// OpenAIDecider implements the Decider interface using OpenAI's API
+type OpenAIDecider struct {
+	cfg *store.Config
+}
 
-func NewOpenAIDecider(cfg *store.Config) *OpenAIDecider { return &OpenAIDecider{cfg: cfg} }
+// NewOpenAIDecider creates a new OpenAI-based decider
+func NewOpenAIDecider(cfg *store.Config) *OpenAIDecider {
+	return &OpenAIDecider{cfg: cfg}
+}
 
+// Decide makes a trading decision using OpenAI's API
 func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.Candle, inds types.Indicators, ctxmap map[string]any) (types.Decision, error) {
 	logger.Debug(ctx, "OpenAI decider called", "symbol", symbol, "model", d.cfg.LLM.Model)
 

@@ -10,10 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"llm-trading-bot/internal/broker"
+	"llm-trading-bot/internal/broker/zerodha"
 	"llm-trading-bot/internal/engine"
 	"llm-trading-bot/internal/eod"
-	"llm-trading-bot/internal/llm"
+	"llm-trading-bot/internal/llm/claude"
+	"llm-trading-bot/internal/llm/noop"
+	"llm-trading-bot/internal/llm/openai"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/tradelog"
@@ -76,7 +78,7 @@ func main() {
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 
 	// Initialize broker
-	brk := broker.NewZerodha(cpf(cfg))
+	brk := zerodha.NewZerodha(cpf(cfg))
 	if cfg.Mode == "DRY_RUN" {
 		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
 	}
@@ -84,11 +86,11 @@ func main() {
 	// Initialize LLM decider
 	var decider types.Decider
 	if cfg.LLM.Provider == "OPENAI" {
-		decider = llm.NewOpenAIDecider(cfg)
+		decider = openai.NewOpenAIDecider(cfg)
 	} else if cfg.LLM.Provider == "CLAUDE" {
-		decider = llm.NewClaudeDecider(cfg)
+		decider = claude.NewClaudeDecider(cfg)
 	} else {
-		decider = llm.NewNoopDecider()
+		decider = noop.NewNoopDecider()
 		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
 	}
 
@@ -179,6 +181,6 @@ func main() {
 	}
 }
 
-func cpf(c *store.Config) broker.Params {
-	return broker.Params{Mode: c.Mode, APIKey: os.Getenv("KITE_API_KEY"), AccessToken: os.Getenv("KITE_ACCESS_TOKEN"), Exchange: c.Exchange}
+func cpf(c *store.Config) zerodha.Params {
+	return zerodha.Params{Mode: c.Mode, APIKey: os.Getenv("KITE_API_KEY"), AccessToken: os.Getenv("KITE_ACCESS_TOKEN"), Exchange: c.Exchange}
 }
