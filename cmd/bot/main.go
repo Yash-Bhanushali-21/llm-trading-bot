@@ -9,35 +9,19 @@ import (
 	"syscall"
 	"time"
 
-	"llm-trading-bot/internal/broker/zerodha"
-	"llm-trading-bot/internal/engine"
 	"llm-trading-bot/internal/eod"
-	"llm-trading-bot/internal/llm/claude"
-	"llm-trading-bot/internal/llm/noop"
-	"llm-trading-bot/internal/llm/openai"
 	"llm-trading-bot/internal/logger"
-	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/trace"
-	"llm-trading-bot/internal/tradelog"
-	"llm-trading-bot/internal/types"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load environment variables
-	_ = godotenv.Load()
-
-	// Initialize logger and tracer
-	if err := logger.Init(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+	// Initialize system (logger, tracer, env)
+	if err := initializeSystem(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	if err := trace.Init(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize tracer: %v\n", err)
-	}
 
-	// Create root context with tracing span for the entire session
+	// Create root context with tracing span
 	ctx := context.Background()
 	ctx, mainSpan := trace.StartSpan(ctx, "trading-bot-session")
 	defer mainSpan.End()
@@ -52,9 +36,8 @@ func main() {
 	}()
 
 	// Load configuration
-	cfg, err := store.LoadConfig("config.yaml")
+	cfg, err := loadConfig(ctx)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to load config", err)
 		os.Exit(1)
 	}
 
@@ -62,38 +45,17 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Compress old logs if retention is configured
-	if v := os.Getenv("TRADER_LOG_RETENTION_DAYS"); v != "" {
-		var n int
-		fmt.Sscanf(v, "%d", &n)
-		if err := tradelog.CompressOlder(n); err != nil {
-			logger.Warn(ctx, "Failed to compress old logs", "error", err)
-		}
-	}
+	// Compress old logs
+	compressOldLogs(ctx)
 
-	// Setup signal handling for graceful shutdown
+	// Setup signal handling
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 
-	// Initialize broker
-	brk := zerodha.NewZerodha(cpf(cfg))
-	if cfg.Mode == "DRY_RUN" {
-		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
-	}
-
-	// Initialize LLM decider
-	var decider types.Decider
-	if cfg.LLM.Provider == "OPENAI" {
-		decider = openai.NewOpenAIDecider(cfg)
-	} else if cfg.LLM.Provider == "CLAUDE" {
-		decider = claude.NewClaudeDecider(cfg)
-	} else {
-		decider = noop.NewNoopDecider()
-		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
-	}
-
-	// Initialize trading engine
-	eng := engine.New(cfg, brk, decider)
+	// Initialize components
+	brk := initializeBroker(ctx, cfg)
+	decider := initializeDecider(ctx, cfg)
+	eng := initializeEngine(cfg, brk, decider)
 
 	// Setup tickers
 	tick := time.NewTicker(time.Duration(cfg.PollSeconds) * time.Second)
@@ -166,8 +128,4 @@ func main() {
 			return
 		}
 	}
-}
-
-func cpf(c *store.Config) zerodha.Params {
-	return zerodha.Params{Mode: c.Mode, APIKey: os.Getenv("KITE_API_KEY"), AccessToken: os.Getenv("KITE_ACCESS_TOKEN"), Exchange: c.Exchange}
 }
