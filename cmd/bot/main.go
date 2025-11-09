@@ -55,16 +55,8 @@ func main() {
 	}()
 
 	// Load configuration
-	logger.Debug(ctx, "Loading configuration from config.yaml")
 	cfg, err := store.LoadConfig("config.yaml")
 	must(ctx, err)
-	logger.Info(ctx, "Configuration loaded successfully",
-		"mode", cfg.Mode,
-		"exchange", cfg.Exchange,
-		"poll_seconds", cfg.PollSeconds,
-		"symbols_count", len(cfg.UniverseStatic),
-		"llm_provider", cfg.LLM.Provider,
-	)
 
 	// Setup cancellation context
 	ctx, cancel := context.WithCancel(ctx)
@@ -74,44 +66,33 @@ func main() {
 	if v := os.Getenv("TRADER_LOG_RETENTION_DAYS"); v != "" {
 		var n int
 		fmt.Sscanf(v, "%d", &n)
-		logger.Debug(ctx, "Compressing old trade logs", "retention_days", n)
 		if err := tradelog.CompressOlder(n); err != nil {
 			logger.Warn(ctx, "Failed to compress old logs", "error", err)
-		} else {
-			logger.Debug(ctx, "Old logs compressed successfully")
 		}
 	}
 
 	// Setup signal handling for graceful shutdown
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-	logger.Debug(ctx, "Signal handlers registered")
 
 	// Initialize broker
-	logger.Info(ctx, "Initializing broker", "broker", "zerodha", "mode", cfg.Mode)
 	brk := broker.NewZerodha(cpf(cfg))
 	if cfg.Mode == "DRY_RUN" {
 		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
-	} else {
-		logger.Info(ctx, "Running in LIVE mode - real orders will be placed")
 	}
 
 	// Initialize LLM decider
 	var decider types.Decider
-	logger.Info(ctx, "Initializing LLM decider", "provider", cfg.LLM.Provider)
 	if cfg.LLM.Provider == "OPENAI" {
 		decider = llm.NewOpenAIDecider(cfg)
-		logger.Info(ctx, "OpenAI decider initialized", "model", cfg.LLM.Model)
 	} else if cfg.LLM.Provider == "CLAUDE" {
 		decider = llm.NewClaudeDecider(cfg)
-		logger.Info(ctx, "Claude decider initialized", "model", cfg.LLM.Model)
 	} else {
 		decider = llm.NewNoopDecider()
 		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
 	}
 
 	// Initialize trading engine
-	logger.Info(ctx, "Initializing trading engine")
 	eng := engine.New(cfg, brk, decider)
 
 	// Setup tickers

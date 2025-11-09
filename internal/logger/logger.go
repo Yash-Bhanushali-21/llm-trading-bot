@@ -85,18 +85,8 @@ func InitWithConfig(config LogConfig) error {
 		if err := initTracer(); err != nil {
 			globalLogger.Warn("Failed to initialize OpenTelemetry tracer, tracing disabled", "error", err)
 			tracingEnabled = false
-		} else {
-			globalLogger.Info("OpenTelemetry tracer initialized successfully")
 		}
 	}
-
-	// Log initialization
-	globalLogger.Info("Logger initialized",
-		"level", config.Level,
-		"format", config.Format,
-		"detailed_logging", config.DetailedLogging,
-		"tracing_enabled", tracingEnabled,
-	)
 
 	return nil
 }
