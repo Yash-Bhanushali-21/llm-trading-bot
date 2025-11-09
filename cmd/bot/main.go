@@ -117,26 +117,19 @@ func main() {
 			logger.Debug(tickCtx, "Tick - processing symbols", "count", len(cfg.UniverseStatic))
 
 			for _, sym := range cfg.UniverseStatic {
-				// Create symbol-specific span
 				symCtx, symSpan := logger.StartSpan(tickCtx, "process-symbol")
-				logger.Debug(symCtx, "Processing symbol", "symbol", sym)
 
-				timer := logger.StartOperation(symCtx, "symbol_processing", "symbol", sym)
-				st, err := eng.Step(timer.GetContext(), sym)
+				st, err := eng.Step(symCtx, sym)
 				if err != nil {
-					timer.EndWithError(err)
 					logger.ErrorWithErr(symCtx, "Symbol processing failed", err, "symbol", sym)
 					symSpan.End()
 					continue
 				}
-				timer.End("status", "success")
 
 				if st != nil {
 					logger.Debug(symCtx, "Symbol state updated", "symbol", sym, "state", st)
-					if logger.IsDebugEnabled() {
-						b, _ := json.Marshal(st)
-						fmt.Println(string(b))
-					}
+					b, _ := json.Marshal(st)
+					fmt.Println(string(b))
 				}
 				symSpan.End()
 			}
@@ -144,15 +137,11 @@ func main() {
 
 		case <-eodTick.C:
 			eodCtx, eodSpan := logger.StartSpan(ctx, "eod-check")
-			logger.Debug(eodCtx, "Checking if EOD summary should run")
 			if ok, _ := eod.ShouldRunNow(); ok {
 				logger.Info(eodCtx, "Running end-of-day summary")
-				timer := logger.StartOperation(eodCtx, "eod_summary")
 				if p, err := eod.SummarizeToday(); err == nil && p != "" {
-					timer.End("path", p)
 					logger.Info(eodCtx, "EOD CSV written successfully", "path", p)
 				} else if err != nil {
-					timer.EndWithError(err)
 					logger.ErrorWithErr(eodCtx, "Failed to write EOD CSV", err)
 				}
 			}

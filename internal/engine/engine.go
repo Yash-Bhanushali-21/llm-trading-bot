@@ -35,33 +35,23 @@ func New(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
 }
 func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
 	logger.Debug(ctx, "Starting trading step", "symbol", symbol)
-	timer := logger.StartOperation(ctx, "trading_step", "symbol", symbol)
 
-	// Fetch candles with logging
-	logger.Debug(ctx, "Fetching recent candles", "symbol", symbol, "count", 250)
-	candleTimer := logger.StartOperation(ctx, "fetch_candles", "symbol", symbol)
-	candles, err := e.brk.RecentCandles(candleTimer.GetContext(), symbol, 250)
+	// Fetch candles
+	candles, err := e.brk.RecentCandles(ctx, symbol, 250)
 	if err != nil {
-		candleTimer.EndWithError(err)
 		logger.ErrorWithErr(ctx, "Failed to fetch candles", err, "symbol", symbol)
-		timer.EndWithError(err)
 		return nil, err
 	}
-	candleTimer.End("candles_received", len(candles))
 	logger.Debug(ctx, "Candles fetched successfully", "symbol", symbol, "count", len(candles))
 
 	if len(candles) < 50 {
 		err := errors.New("not enough candles")
 		logger.Error(ctx, "Insufficient candle data", "symbol", symbol, "received", len(candles), "required", 50)
-		timer.EndWithError(err)
 		return nil, err
 	}
 
 	// Calculate indicators
-	logger.Debug(ctx, "Calculating technical indicators", "symbol", symbol)
-	indTimer := logger.StartOperation(ctx, "calculate_indicators", "symbol", symbol)
 	inds := e.calcIndicators(candles)
-	indTimer.End()
 	logger.Debug(ctx, "Indicators calculated",
 		"symbol", symbol,
 		"rsi", inds.RSI,
@@ -80,9 +70,10 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 
 	// Check stop-loss trigger
 	if p := e.pos[symbol]; p != nil && p.qty > 0 {
-		logger.Debug(ctx, "Checking stop-loss", "symbol", symbol, "position_qty", p.qty, "position_avg", p.avg, "stop_price", p.stop, "current_price", price)
 		if price <= p.stop {
-			logger.Risk(ctx, symbol, "STOP_LOSS_TRIGGERED",
+			logger.Warn(ctx, "Stop loss triggered",
+				"symbol", symbol,
+				"event", "STOP_LOSS_TRIGGERED",
 				"current_price", price,
 				"stop_price", p.stop,
 				"position_qty", p.qty,
@@ -92,10 +83,9 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 
 			resp, err := e.brk.PlaceOrder(ctx, types.OrderReq{Symbol: symbol, Side: "SELL", Qty: p.qty, Tag: "SL"})
 			if err == nil {
-				logger.Trade(ctx, symbol, "SELL", p.qty, price, resp.OrderID, "tag", "SL", "reason", "STOP_LOSS")
+				logger.Info(ctx, "Trade executed", "symbol", symbol, "side", "SELL", "qty", p.qty, "price", price, "order_id", resp.OrderID, "tag", "SL", "reason", "STOP_LOSS")
 				_ = tradelog.Append(tradelog.Entry{Symbol: symbol, Side: "SELL", Qty: p.qty, Price: price, OrderID: resp.OrderID, Reason: "STOP_LOSS", Confidence: 1.0})
 				delete(e.pos, symbol)
-				timer.End("action", "stop_loss_triggered")
 				return &types.StepResult{Symbol: symbol, Price: price, Time: latest.Ts, Orders: []types.OrderResp{resp}, Reason: "STOP_LOSS_TRIGGERED"}, nil
 			} else {
 				logger.ErrorWithErr(ctx, "Failed to execute stop-loss order", err, "symbol", symbol, "qty", p.qty, "price", price)
@@ -104,19 +94,14 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 	}
 
 	// Get LLM decision
-	logger.Debug(ctx, "Requesting LLM decision", "symbol", symbol, "price", price)
-	llmTimer := logger.StartOperation(ctx, "llm_decision", "symbol", symbol)
-	decision, err := e.llm.Decide(llmTimer.GetContext(), symbol, latest, inds, map[string]any{"price": price, "risk": e.cfg.Risk})
+	decision, err := e.llm.Decide(ctx, symbol, latest, inds, map[string]any{"price": price, "risk": e.cfg.Risk})
 	if err != nil {
-		llmTimer.EndWithError(err)
 		logger.ErrorWithErr(ctx, "LLM decision failed", err, "symbol", symbol)
-		timer.EndWithError(err)
 		return nil, err
 	}
-	llmTimer.End("action", decision.Action, "confidence", decision.Confidence)
 
 	// Log the decision
-	logger.Decision(ctx, symbol, decision.Action, decision.Confidence, decision.Reason)
+	logger.Info(ctx, "Trading decision", "symbol", symbol, "action", decision.Action, "confidence", decision.Confidence, "reason", decision.Reason)
 	_ = tradelog.AppendDecision(tradelog.DecisionEntry{Symbol: symbol, Action: decision.Action, Confidence: decision.Confidence, Reason: decision.Reason, Price: price, Indicators: map[string]float64{"RSI": inds.RSI, "SMA20": inds.SMA[20], "SMA50": inds.SMA[50], "SMA200": inds.SMA[200], "BB_MID": inds.BB.Middle, "BB_UP": inds.BB.Upper, "BB_LOW": inds.BB.Lower, "ATR": inds.ATR}})
 
 	qty := e.pickQty(symbol, decision)
@@ -133,7 +118,9 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		riskExceeded := e.exceedsRisk(e.cfg.Risk.PerTradeRiskPct, price, qty)
 		if riskExceeded {
 			exposure := price * float64(qty)
-			logger.Risk(ctx, symbol, "TRADE_BLOCKED_RISK_CAP",
+			logger.Warn(ctx, "Trade blocked by risk cap",
+				"symbol", symbol,
+				"event", "TRADE_BLOCKED_RISK_CAP",
 				"qty", qty,
 				"price", price,
 				"exposure", exposure,
@@ -141,11 +128,10 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 			)
 			reason += " | blocked: risk cap"
 		} else {
-			logger.Debug(ctx, "Risk check passed, placing BUY order", "symbol", symbol, "qty", qty, "price", price)
 			resp, err := e.brk.PlaceOrder(ctx, types.OrderReq{Symbol: symbol, Side: "BUY", Qty: qty, Tag: "LLM"})
 			if err == nil {
 				orders = append(orders, resp)
-				logger.Trade(ctx, symbol, "BUY", qty, price, resp.OrderID, "tag", "LLM", "confidence", decision.Confidence)
+				logger.Info(ctx, "Trade executed", "symbol", symbol, "side", "BUY", "qty", qty, "price", price, "order_id", resp.OrderID, "tag", "LLM", "confidence", decision.Confidence)
 				_ = tradelog.Append(tradelog.Entry{Symbol: symbol, Side: "BUY", Qty: qty, Price: price, OrderID: resp.OrderID, Reason: decision.Reason, Confidence: decision.Confidence})
 
 				// Update position
@@ -185,7 +171,7 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		resp, err := e.brk.PlaceOrder(ctx, types.OrderReq{Symbol: symbol, Side: "SELL", Qty: qty, Tag: "LLM"})
 		if err == nil {
 			orders = append(orders, resp)
-			logger.Trade(ctx, symbol, "SELL", qty, price, resp.OrderID, "tag", "LLM", "confidence", decision.Confidence)
+			logger.Info(ctx, "Trade executed", "symbol", symbol, "side", "SELL", "qty", qty, "price", price, "order_id", resp.OrderID, "tag", "LLM", "confidence", decision.Confidence)
 			_ = tradelog.Append(tradelog.Entry{Symbol: symbol, Side: "SELL", Qty: qty, Price: price, OrderID: resp.OrderID, Reason: decision.Reason, Confidence: decision.Confidence})
 
 			// Update position
@@ -233,7 +219,6 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		}
 	}
 
-	timer.End("action", decision.Action, "orders_placed", len(orders))
 	logger.Debug(ctx, "Trading step completed", "symbol", symbol, "action", decision.Action, "orders", len(orders))
 	return &types.StepResult{Symbol: symbol, Decision: decision, Price: price, Time: latest.Ts, Orders: orders, Reason: reason}, nil
 }
