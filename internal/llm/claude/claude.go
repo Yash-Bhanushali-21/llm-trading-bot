@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"llm-trading-bot/internal/logger"
+	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/types"
 )
@@ -39,7 +40,7 @@ func (d *ClaudeDecider) Decide(ctx context.Context, symbol string, latest types.
 	logger.Debug(ctx, "Claude decider called", "symbol", symbol, "model", d.cfg.LLM.Model, "endpoint", d.endpoint)
 
 	// Create span for LLM API call
-	ctx, span := logger.StartSpan(ctx, "claude-decide")
+	ctx, span := trace.StartSpan(ctx, "claude-decide")
 	defer span.End()
 
 	// Validate API key

@@ -17,6 +17,7 @@ import (
 	"llm-trading-bot/internal/llm/openai"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
+	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/tradelog"
 	"llm-trading-bot/internal/types"
 
@@ -27,15 +28,18 @@ func main() {
 	// Load environment variables
 	_ = godotenv.Load()
 
-	// Initialize logger first
+	// Initialize logger and tracer
 	if err := logger.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
 	}
+	if err := trace.Init(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize tracer: %v\n", err)
+	}
 
 	// Create root context with tracing span for the entire session
 	ctx := context.Background()
-	ctx, mainSpan := logger.StartSpan(ctx, "trading-bot-session")
+	ctx, mainSpan := trace.StartSpan(ctx, "trading-bot-session")
 	defer mainSpan.End()
 
 	logger.Info(ctx, "=== LLM Trading Bot Starting ===")
@@ -44,7 +48,7 @@ func main() {
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = logger.Shutdown(shutdownCtx)
+		_ = trace.Shutdown(shutdownCtx)
 	}()
 
 	// Load configuration
@@ -107,11 +111,11 @@ func main() {
 		select {
 		case <-tick.C:
 			// Create a new span for this tick
-			tickCtx, tickSpan := logger.StartSpan(ctx, "tick-processing")
+			tickCtx, tickSpan := trace.StartSpan(ctx, "tick-processing")
 			logger.Debug(tickCtx, "Tick - processing symbols", "count", len(cfg.UniverseStatic))
 
 			for _, sym := range cfg.UniverseStatic {
-				symCtx, symSpan := logger.StartSpan(tickCtx, "process-symbol")
+				symCtx, symSpan := trace.StartSpan(tickCtx, "process-symbol")
 
 				st, err := eng.Step(symCtx, sym)
 				if err != nil {
@@ -130,7 +134,7 @@ func main() {
 			tickSpan.End()
 
 		case <-eodTick.C:
-			eodCtx, eodSpan := logger.StartSpan(ctx, "eod-check")
+			eodCtx, eodSpan := trace.StartSpan(ctx, "eod-check")
 			if ok, _ := eod.ShouldRunNow(); ok {
 				logger.Info(eodCtx, "Running end-of-day summary")
 				if p, err := eod.SummarizeToday(); err == nil && p != "" {
@@ -142,7 +146,7 @@ func main() {
 			eodSpan.End()
 
 		case <-sigc:
-			shutdownCtx, shutdownSpan := logger.StartSpan(ctx, "graceful-shutdown")
+			shutdownCtx, shutdownSpan := trace.StartSpan(ctx, "graceful-shutdown")
 			logger.Info(shutdownCtx, "Shutdown signal received - gracefully shutting down")
 
 			// Generate final EOD summary

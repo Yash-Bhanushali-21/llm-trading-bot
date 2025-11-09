@@ -5,30 +5,21 @@ import (
 	"os"
 	"strings"
 
-	"go.opentelemetry.io/otel"
+	"llm-trading-bot/internal/trace"
+
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-	"go.opentelemetry.io/otel/trace"
+	ottrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	globalLogger   *zap.SugaredLogger
-	tracingEnabled bool
-	tracer         trace.Tracer
-	tracerProvider *sdktrace.TracerProvider
-)
+var globalLogger *zap.SugaredLogger
 
-// Init initializes the global logger and tracer based on environment variables
+// Init initializes the global logger
 func Init() error {
 	level := getEnv("LOG_LEVEL", "INFO")
 	format := getEnv("LOG_FORMAT", "json")
 	detailed := getEnv("LOG_DETAILED", "false") == "true"
-	tracingEnabled = getEnv("LOG_TRACING_ENABLED", "true") == "true"
 
 	// Create encoder config
 	encoderConfig := zap.NewProductionEncoderConfig()
@@ -60,31 +51,7 @@ func Init() error {
 	logger := zap.New(core, opts...)
 	globalLogger = logger.Sugar()
 
-	// Initialize OpenTelemetry tracer if enabled
-	if tracingEnabled {
-		if err := initTracer(); err != nil {
-			globalLogger.Warnw("Failed to initialize tracer", "error", err)
-			tracingEnabled = false
-		}
-	}
-
 	return nil
-}
-
-// Shutdown gracefully shuts down the tracer provider
-func Shutdown(ctx context.Context) error {
-	if tracerProvider != nil {
-		return tracerProvider.Shutdown(ctx)
-	}
-	return nil
-}
-
-// StartSpan starts a new OpenTelemetry span
-func StartSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	if !tracingEnabled || tracer == nil {
-		return ctx, trace.SpanFromContext(ctx)
-	}
-	return tracer.Start(ctx, spanName, opts...)
 }
 
 // Debug logs a debug message
@@ -109,8 +76,8 @@ func Error(ctx context.Context, msg string, keysAndValues ...interface{}) {
 
 // ErrorWithErr logs an error with error object and records it in span
 func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...interface{}) {
-	if tracingEnabled {
-		if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+	if trace.Enabled() {
+		if span := ottrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 		}
@@ -121,44 +88,11 @@ func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...i
 
 // Helper functions
 
-func initTracer() error {
-	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-	if err != nil {
-		return err
-	}
-
-	res, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceName("llm-trading-bot"),
-			semconv.ServiceVersion("1.0.0"),
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	tracerProvider = sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-	)
-	otel.SetTracerProvider(tracerProvider)
-	tracer = otel.Tracer("llm-trading-bot")
-	return nil
-}
-
 func traceFields(ctx context.Context) []interface{} {
-	if !tracingEnabled {
-		return nil
+	if traceID, spanID, ok := trace.GetTraceFields(ctx); ok {
+		return []interface{}{"trace_id", traceID, "span_id", spanID}
 	}
-	span := trace.SpanFromContext(ctx)
-	if !span.SpanContext().IsValid() {
-		return nil
-	}
-	return []interface{}{
-		"trace_id", span.SpanContext().TraceID().String(),
-		"span_id", span.SpanContext().SpanID().String(),
-	}
+	return nil
 }
 
 func parseLogLevel(level string) zapcore.Level {

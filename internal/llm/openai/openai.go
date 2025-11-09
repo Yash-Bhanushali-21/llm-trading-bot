@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"llm-trading-bot/internal/logger"
+	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/types"
 )
@@ -31,7 +32,7 @@ func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.
 	logger.Debug(ctx, "OpenAI decider called", "symbol", symbol, "model", d.cfg.LLM.Model)
 
 	// Create span for LLM API call
-	ctx, span := logger.StartSpan(ctx, "openai-decide")
+	ctx, span := trace.StartSpan(ctx, "openai-decide")
 	defer span.End()
 
 	// Validate API key
