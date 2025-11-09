@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,20 +23,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func must(ctx context.Context, err error) {
-	if err != nil {
-		logger.ErrorWithErr(ctx, "Fatal error", err)
-		log.Fatal(err)
-	}
-}
-
 func main() {
 	// Load environment variables
 	_ = godotenv.Load()
 
 	// Initialize logger first
 	if err := logger.Init(); err != nil {
-		log.Fatal("Failed to initialize logger:", err)
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Create root context with tracing span for the entire session
@@ -51,14 +44,15 @@ func main() {
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := logger.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Error shutting down tracer: %v", err)
-		}
+		_ = logger.Shutdown(shutdownCtx)
 	}()
 
 	// Load configuration
 	cfg, err := store.LoadConfig("config.yaml")
-	must(ctx, err)
+	if err != nil {
+		logger.ErrorWithErr(ctx, "Failed to load config", err)
+		os.Exit(1)
+	}
 
 	// Setup cancellation context
 	ctx, cancel := context.WithCancel(ctx)
