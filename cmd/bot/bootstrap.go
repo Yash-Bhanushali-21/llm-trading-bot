@@ -92,6 +92,6 @@ func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 }
 
 // initializeEngine initializes and returns the trading engine
-func initializeEngine(cfg *store.Config, brk zerodha.Broker, decider types.Decider) *engine.Engine {
+func initializeEngine(cfg *store.Config, brk zerodha.Broker, decider types.Decider) engine.IEngine {
 	return engine.New(cfg, brk, decider)
 }
