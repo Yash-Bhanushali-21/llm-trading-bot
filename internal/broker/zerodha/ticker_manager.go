@@ -37,6 +37,12 @@ type tickerManager struct {
 	tokenToSymbol map[uint32]string
 }
 
+// Compile-time interface checks
+var (
+	_ TickerManager      = (*tickerManager)(nil)
+	_ TickerEventHandler = (*tickerManager)(nil)
+)
+
 // Start initializes and starts the WebSocket connection
 func (tm *tickerManager) Start(ctx context.Context) error {
 	// Create Kite Connect client

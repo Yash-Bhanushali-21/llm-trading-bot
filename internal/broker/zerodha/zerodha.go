@@ -27,6 +27,9 @@ type Zerodha struct {
 	isTickerInit bool
 }
 
+// Compile-time interface check
+var _ Broker = (*Zerodha)(nil)
+
 // NewZerodha creates a new Zerodha broker instance
 func NewZerodha(p Params) *Zerodha {
 	z := &Zerodha{p: p}
