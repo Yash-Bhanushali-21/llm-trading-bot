@@ -52,16 +52,7 @@ func (oe *orderExecutor) placeBuyOrder(ctx context.Context, symbol string, qty i
 		return types.OrderResp{}, err
 	}
 
-	// Log successful trade
-	logger.Info(ctx, "Trade executed",
-		"symbol", symbol,
-		"side", "BUY",
-		"qty", qty,
-		"price", price,
-		"order_id", resp.OrderID,
-		"tag", "LLM",
-		"confidence", confidence,
-	)
+	// Trade logged via middleware
 
 	// Append to trade log
 	_ = tradelog.Append(tradelog.Entry{
@@ -109,16 +100,7 @@ func (oe *orderExecutor) placeSellOrder(ctx context.Context, symbol string, qty 
 		return types.OrderResp{}, err
 	}
 
-	// Log successful trade
-	logger.Info(ctx, "Trade executed",
-		"symbol", symbol,
-		"side", "SELL",
-		"qty", qty,
-		"price", price,
-		"order_id", resp.OrderID,
-		"tag", tag,
-		"confidence", confidence,
-	)
+	// Trade logged via middleware
 
 	// Append to trade log
 	_ = tradelog.Append(tradelog.Entry{
@@ -136,12 +118,7 @@ func (oe *orderExecutor) placeSellOrder(ctx context.Context, symbol string, qty 
 
 // logDecision logs the LLM trading decision to the decision log.
 func (oe *orderExecutor) logDecision(ctx context.Context, symbol string, decision types.Decision, price float64, indicators types.Indicators) {
-	logger.Info(ctx, "Trading decision",
-		"symbol", symbol,
-		"action", decision.Action,
-		"confidence", decision.Confidence,
-		"reason", decision.Reason,
-	)
+	// Decision logged via middleware
 
 	_ = tradelog.AppendDecision(tradelog.DecisionEntry{
 		Symbol:     symbol,

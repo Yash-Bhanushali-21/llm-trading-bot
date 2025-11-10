@@ -50,7 +50,6 @@ func newEngine(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
 
 // Step executes one complete trading cycle for a symbol.
 func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
-	logger.Debug(ctx, "Starting trading step", "symbol", symbol)
 
 	// 1. Fetch market data
 	candles, err := e.fetchCandles(ctx, symbol)
@@ -77,7 +76,6 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 
 	latest := candles[len(candles)-1]
 	price := latest.Close
-	logger.Debug(ctx, "Current market state", "symbol", symbol, "price", price, "timestamp", latest.Ts)
 
 	// 3. Check stop-loss trigger
 	if result := e.handleStopLoss(ctx, symbol, price, latest.Ts); result != nil {
@@ -108,7 +106,6 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		DefaultSell: e.cfg.Qty.DefaultSell,
 	})
 
-	logger.Debug(ctx, "Position sizing determined", "symbol", symbol, "action", decision.Action, "qty", qty)
 
 	// 6. Execute trading action
 	orders, reason := e.executeDecision(ctx, symbol, decision, qty, price, indicators.ATR)
@@ -116,7 +113,6 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 	// 7. Update trailing stop if enabled
 	e.updateTrailingStop(ctx, symbol, price, indicators.ATR)
 
-	logger.Debug(ctx, "Trading step completed", "symbol", symbol, "action", decision.Action, "orders", len(orders))
 
 	return &types.StepResult{
 		Symbol:   symbol,
@@ -136,7 +132,6 @@ func (e *Engine) fetchCandles(ctx context.Context, symbol string) ([]types.Candl
 		return nil, err
 	}
 
-	logger.Debug(ctx, "Candles fetched successfully", "symbol", symbol, "count", len(candles))
 
 	if len(candles) < 50 {
 		err := errors.New("not enough candles")
@@ -149,17 +144,7 @@ func (e *Engine) fetchCandles(ctx context.Context, symbol string) ([]types.Candl
 
 // logIndicators logs calculated indicator values for debugging.
 func (e *Engine) logIndicators(ctx context.Context, symbol string, inds types.Indicators) {
-	logger.Debug(ctx, "Indicators calculated",
-		"symbol", symbol,
-		"rsi", inds.RSI,
-		"sma20", inds.SMA[20],
-		"sma50", inds.SMA[50],
-		"sma200", inds.SMA[200],
-		"bb_upper", inds.BB.Upper,
-		"bb_middle", inds.BB.Middle,
-		"bb_lower", inds.BB.Lower,
-		"atr", inds.ATR,
-	)
+	// Indicators logged via middleware
 }
 
 // handleStopLoss checks and executes stop-loss if triggered.
@@ -203,7 +188,6 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 			return orders, reason
 		}
 
-		logger.Debug(ctx, "Processing BUY decision", "symbol", symbol, "qty", qty, "price", price)
 
 		// Risk check
 		riskExceeded, _ := e.risk.validateTrade(ctx, symbol, price, qty, e.cfg.Risk.PerTradeRiskPct)
@@ -232,7 +216,6 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 			return orders, reason
 		}
 
-		logger.Debug(ctx, "Processing SELL decision", "symbol", symbol, "qty", qty, "price", price)
 
 		// Place order
 		resp, err := e.executor.placeSellOrder(ctx, symbol, qty, price, decision.Reason, decision.Confidence, "LLM")
@@ -247,7 +230,6 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 		e.positions.reduceSell(ctx, symbol, qty, price)
 
 	case "HOLD":
-		logger.Debug(ctx, "HOLD decision - no action taken", "symbol", symbol, "reason", decision.Reason)
 	}
 
 	return orders, reason

@@ -61,12 +61,8 @@ func (pm *positionManager) addBuy(ctx context.Context, symbol string, qty int, p
 			entryTime: time.Now(), // Set entry time for time-based stops
 		}
 		pm.positions[symbol] = p
-		logger.Debug(ctx, "New position created", "symbol", symbol, "qty", qty, "avg", price, "stop", stopPrice, "entry_time", p.entryTime)
 	} else {
 		// Add to existing position
-		oldQty := p.qty
-		oldAvg := p.avg
-
 		// Calculate new average price
 		totalCost := p.avg*float64(p.qty) + price*float64(qty)
 		p.qty += qty
@@ -77,16 +73,7 @@ func (pm *positionManager) addBuy(ctx context.Context, symbol string, qty int, p
 		if stopPrice > p.stop {
 			p.stop = stopPrice
 		}
-
-		logger.Info(ctx, "Position updated after BUY",
-			"symbol", symbol,
-			"old_qty", oldQty,
-			"old_avg", oldAvg,
-			"new_qty", p.qty,
-			"new_avg", p.avg,
-			"stop_price", p.stop,
-			"atr", p.lastATR,
-		)
+		// Position update logged via middleware
 	}
 }
 
@@ -108,24 +95,15 @@ func (pm *positionManager) reduceSell(ctx context.Context, symbol string, qty in
 		return 0
 	}
 
-	oldQty := p.qty
 	p.qty -= qty
 
 	// Calculate realized P&L
 	realizedPnL := (price - p.avg) * float64(qty)
 
-	logger.Info(ctx, "Position updated after SELL",
-		"symbol", symbol,
-		"old_qty", oldQty,
-		"new_qty", p.qty,
-		"avg_price", p.avg,
-		"sell_price", price,
-		"realized_pnl", realizedPnL,
-	)
+	// Position reduction logged via middleware
 
 	// Close position if fully sold
 	if p.qty <= 0 {
-		logger.Info(ctx, "Position closed", "symbol", symbol, "realized_pnl", realizedPnL)
 		delete(pm.positions, symbol)
 	}
 
@@ -154,18 +132,12 @@ func (pm *positionManager) updateTrailingStop(ctx context.Context, symbol string
 		return false
 	}
 
-	oldStop := p.stop
 	p.lastATR = atr
 
 	// Only trail up, never down
 	if newStop > p.stop {
 		p.stop = newStop
-		logger.Debug(ctx, "Trailing stop updated",
-			"symbol", symbol,
-			"old_stop", oldStop,
-			"new_stop", p.stop,
-			"atr", p.lastATR,
-		)
+		// Trailing stop update logged via middleware
 		return true
 	}
 
