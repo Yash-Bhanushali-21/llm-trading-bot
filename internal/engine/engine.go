@@ -5,36 +5,31 @@ import (
 	"errors"
 	"time"
 
-	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/types"
 )
 
-// Engine is the main trading engine that orchestrates all components.
 type Engine struct {
 	cfg      *store.Config
-	broker   zerodha.Broker
+	broker   interfaces.Broker
 	llm      types.Decider
 	dayStart time.Time
 
-	// Decoupled components
 	positions *positionManager
 	risk      *riskManager
 	stop      *stopManager
 	executor  *orderExecutor
 }
 
-// newEngine creates a new Engine instance (internal constructor).
-// Use New() function instead to get IEngine interface.
-func newEngine(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
+func newEngine(cfg *store.Config, brk interfaces.Broker, d types.Decider) *Engine {
 	return &Engine{
 		cfg:      cfg,
 		broker:   brk,
 		llm:      d,
 		dayStart: midnightIST(),
 
-		// Initialize components
 		positions: newPositionManager(),
 		risk:      newRiskManager(),
 		stop: newStopManager(

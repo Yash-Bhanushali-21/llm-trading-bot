@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/types"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
@@ -36,11 +37,7 @@ type tickerManager struct {
 	tokenToSymbol map[uint32]string
 }
 
-// Compile-time interface checks
-var (
-	_ TickerManager      = (*tickerManager)(nil)
-	_ TickerEventHandler = (*tickerManager)(nil)
-)
+var _ interfaces.TickerManager = (*tickerManager)(nil)
 
 // Start initializes and starts the WebSocket connection
 func (tm *tickerManager) Start(ctx context.Context) error {

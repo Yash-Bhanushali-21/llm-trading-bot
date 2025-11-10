@@ -11,6 +11,7 @@ import (
 	"llm-trading-bot/internal/engine/engineobs"
 	"llm-trading-bot/internal/eod"
 	"llm-trading-bot/internal/eod/eodobs"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/llm/claude"
 	"llm-trading-bot/internal/llm/llmobs"
 	"llm-trading-bot/internal/llm/noop"
@@ -67,7 +68,7 @@ func compressOldLogs(ctx context.Context) {
 }
 
 // initializeBroker initializes and returns the broker instance with observability
-func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
+func initializeBroker(ctx context.Context, cfg *store.Config) interfaces.Broker {
 	// Create base broker
 	brk := zerodha.NewZerodha(zerodha.Params{
 		Mode:         cfg.Mode,
@@ -111,7 +112,7 @@ func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 }
 
 // initializeEngine initializes and returns the trading engine with observability
-func initializeEngine(cfg *store.Config, brk zerodha.Broker, decider types.Decider) engine.IEngine {
+func initializeEngine(cfg *store.Config, brk interfaces.Broker, decider types.Decider) interfaces.Engine {
 	// Create base engine
 	eng := engine.New(cfg, brk, decider)
 

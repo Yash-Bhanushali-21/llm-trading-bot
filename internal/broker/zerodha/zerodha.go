@@ -7,27 +7,25 @@ import (
 	"math/rand"
 	"time"
 
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/types"
 )
 
-// Params holds configuration parameters for the Zerodha broker
 type Params struct {
 	Mode         string
 	APIKey       string
 	AccessToken  string
 	Exchange     string
-	CandleSource string // "static" or "live"
+	CandleSource string
 }
 
-// Zerodha implements the Broker interface for Zerodha broker
 type Zerodha struct {
 	p            Params
-	tickerMgr    TickerManager
+	tickerMgr    interfaces.TickerManager
 	isTickerInit bool
 }
 
-// Compile-time interface check
-var _ Broker = (*Zerodha)(nil)
+var _ interfaces.Broker = (*Zerodha)(nil)
 
 // NewZerodha creates a new Zerodha broker instance
 func NewZerodha(p Params) *Zerodha {

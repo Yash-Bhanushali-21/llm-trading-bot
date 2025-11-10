@@ -3,19 +3,17 @@ package engine
 import (
 	"context"
 
-	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/tradelog"
 	"llm-trading-bot/internal/types"
 )
 
-// orderExecutor handles order placement and trade logging.
 type orderExecutor struct {
-	broker zerodha.Broker
+	broker interfaces.Broker
 }
 
-// newOrderExecutor creates a new order executor.
-func newOrderExecutor(broker zerodha.Broker) *orderExecutor {
+func newOrderExecutor(broker interfaces.Broker) *orderExecutor {
 	return &orderExecutor{
 		broker: broker,
 	}

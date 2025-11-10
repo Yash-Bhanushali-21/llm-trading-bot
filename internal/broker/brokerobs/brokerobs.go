@@ -4,22 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/types"
 )
 
-// observableBroker wraps a Broker with observability (logging & tracing)
 type observableBroker struct {
-	broker zerodha.Broker
+	broker interfaces.Broker
 }
 
-// Compile-time interface check
-var _ zerodha.Broker = (*observableBroker)(nil)
+var _ interfaces.Broker = (*observableBroker)(nil)
 
-// Wrap wraps a broker with observability middleware
-func Wrap(broker zerodha.Broker) zerodha.Broker {
+func Wrap(broker interfaces.Broker) interfaces.Broker {
 	return &observableBroker{
 		broker: broker,
 	}

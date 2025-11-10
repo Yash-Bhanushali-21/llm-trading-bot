@@ -4,21 +4,18 @@ import (
 	"context"
 	"time"
 
-	"llm-trading-bot/internal/eod"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/trace"
 )
 
-// observableEodSummarizer wraps an IEodSummarizer with observability (logging & tracing)
 type observableEodSummarizer struct {
-	summarizer eod.IEodSummarizer
+	summarizer interfaces.EodSummarizer
 }
 
-// Compile-time interface check
-var _ eod.IEodSummarizer = (*observableEodSummarizer)(nil)
+var _ interfaces.EodSummarizer = (*observableEodSummarizer)(nil)
 
-// Wrap wraps an EOD summarizer with observability middleware
-func Wrap(summarizer eod.IEodSummarizer) eod.IEodSummarizer {
+func Wrap(summarizer interfaces.EodSummarizer) interfaces.EodSummarizer {
 	return &observableEodSummarizer{
 		summarizer: summarizer,
 	}

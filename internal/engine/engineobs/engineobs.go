@@ -4,22 +4,19 @@ import (
 	"context"
 	"time"
 
-	"llm-trading-bot/internal/engine"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/types"
 )
 
-// observableEngine wraps an IEngine with observability (logging & tracing)
 type observableEngine struct {
-	engine engine.IEngine
+	engine interfaces.Engine
 }
 
-// Compile-time interface check
-var _ engine.IEngine = (*observableEngine)(nil)
+var _ interfaces.Engine = (*observableEngine)(nil)
 
-// Wrap wraps an engine with observability middleware
-func Wrap(eng engine.IEngine) engine.IEngine {
+func Wrap(eng interfaces.Engine) interfaces.Engine {
 	return &observableEngine{
 		engine: eng,
 	}

@@ -11,15 +11,11 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
 )
 
-// eodSummarizer is the default implementation of IEodSummarizer.
 type eodSummarizer struct{}
 
-// NewSummarizer creates a new EOD summarizer instance
-func NewSummarizer() IEodSummarizer {
-	return &eodSummarizer{}
-}
 
 // SummarizeDay generates an end-of-day CSV summary for a specific date.
 func (es *eodSummarizer) SummarizeDay(t time.Time) (string, error) {
