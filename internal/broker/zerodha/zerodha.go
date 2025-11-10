@@ -23,7 +23,7 @@ type Params struct {
 // Zerodha implements the Broker interface for Zerodha broker
 type Zerodha struct {
 	p            Params
-	tickerMgr    *tickerManager
+	tickerMgr    TickerManager
 	isTickerInit bool
 }
 
@@ -91,7 +91,7 @@ func (z *Zerodha) fetchLiveCandles(ctx context.Context, symbol string, n int) ([
 	}
 
 	// Get candles from WebSocket cache
-	candles, err := z.tickerMgr.getRecentCandles(symbol, n)
+	candles, err := z.tickerMgr.GetRecentCandles(symbol, n)
 	if err != nil {
 		logger.Warn(ctx, "Failed to fetch live candles from cache - using static data",
 			"symbol", symbol, "error", err.Error())
@@ -114,7 +114,7 @@ func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
 	}
 
 	// Start WebSocket connection
-	if err := z.tickerMgr.start(ctx); err != nil {
+	if err := z.tickerMgr.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start ticker manager: %w", err)
 	}
 
@@ -122,7 +122,7 @@ func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to symbols
-	if err := z.tickerMgr.subscribe(ctx, symbols); err != nil {
+	if err := z.tickerMgr.Subscribe(ctx, symbols); err != nil {
 		return fmt.Errorf("failed to subscribe to symbols: %w", err)
 	}
 
@@ -134,7 +134,7 @@ func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
 // Stop closes the WebSocket connection
 func (z *Zerodha) Stop(ctx context.Context) {
 	if z.tickerMgr != nil {
-		z.tickerMgr.stop(ctx)
+		z.tickerMgr.Stop(ctx)
 		z.isTickerInit = false
 	}
 }
