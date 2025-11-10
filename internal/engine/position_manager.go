@@ -2,16 +2,18 @@ package engine
 
 import (
 	"context"
+	"time"
 
 	"llm-trading-bot/internal/logger"
 )
 
 // position represents an open trading position for a symbol.
 type position struct {
-	qty     int     // Current quantity held
-	avg     float64 // Average entry price
-	stop    float64 // Stop-loss price
-	lastATR float64 // Last ATR value for stop calculation
+	qty       int       // Current quantity held
+	avg       float64   // Average entry price
+	stop      float64   // Stop-loss price
+	lastATR   float64   // Last ATR value for stop calculation
+	entryTime time.Time // Time when position was opened (for time-based stops)
 }
 
 // positionManager handles all position tracking and updates.
@@ -52,13 +54,14 @@ func (pm *positionManager) addBuy(ctx context.Context, symbol string, qty int, p
 	if p == nil {
 		// New position
 		p = &position{
-			qty:     qty,
-			avg:     price,
-			stop:    stopPrice,
-			lastATR: atr,
+			qty:       qty,
+			avg:       price,
+			stop:      stopPrice,
+			lastATR:   atr,
+			entryTime: time.Now(), // Set entry time for time-based stops
 		}
 		pm.positions[symbol] = p
-		logger.Debug(ctx, "New position created", "symbol", symbol, "qty", qty, "avg", price, "stop", stopPrice)
+		logger.Debug(ctx, "New position created", "symbol", symbol, "qty", qty, "avg", price, "stop", stopPrice, "entry_time", p.entryTime)
 	} else {
 		// Add to existing position
 		oldQty := p.qty
