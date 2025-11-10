@@ -60,15 +60,28 @@ func compressOldLogs(ctx context.Context) {
 
 // initializeBroker initializes and returns the broker instance
 func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
+	// Get candle source from environment (default: static)
+	candleSource := os.Getenv("CANDLE_SOURCE")
+	if candleSource == "" {
+		candleSource = "static"
+	}
+
 	brk := zerodha.NewZerodha(zerodha.Params{
-		Mode:        cfg.Mode,
-		APIKey:      os.Getenv("KITE_API_KEY"),
-		AccessToken: os.Getenv("KITE_ACCESS_TOKEN"),
-		Exchange:    cfg.Exchange,
+		Mode:         cfg.Mode,
+		APIKey:       os.Getenv("KITE_API_KEY"),
+		AccessToken:  os.Getenv("KITE_ACCESS_TOKEN"),
+		Exchange:     cfg.Exchange,
+		CandleSource: candleSource,
 	})
 
 	if cfg.Mode == "DRY_RUN" {
 		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
+	}
+
+	if candleSource == "live" {
+		logger.Info(ctx, "Using LIVE candle data from Zerodha")
+	} else {
+		logger.Info(ctx, "Using STATIC mock candle data for testing")
 	}
 
 	return brk
