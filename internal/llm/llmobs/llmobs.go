@@ -34,7 +34,8 @@ func (od *observableDecider) Decide(
 	ctx, span := trace.StartSpan(ctx, "llm.Decide")
 	defer span.End()
 
-	logger.Debug(ctx, "Requesting trading decision",
+	// Use DebugSkip(1) to report the actual caller, not this middleware wrapper
+	logger.DebugSkip(ctx, 1, "Requesting trading decision",
 		"symbol", symbol,
 		"price", latest.Close,
 		"rsi", indicators.RSI,
@@ -43,15 +44,16 @@ func (od *observableDecider) Decide(
 	// Call underlying decider
 	decision, err := od.decider.Decide(ctx, symbol, latest, indicators, contextData)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to get trading decision", err,
+		// Use ErrorWithErrSkip(1) to report the actual caller
+		logger.ErrorWithErrSkip(ctx, 1, "Failed to get trading decision", err,
 			"symbol", symbol,
 			"price", latest.Close,
 		)
 		return types.Decision{}, err
 	}
 
-	// Log decision result
-	logger.Info(ctx, "Trading decision received",
+	// Log decision result - use InfoSkip(1) to report the actual caller
+	logger.InfoSkip(ctx, 1, "Trading decision received",
 		"symbol", symbol,
 		"action", decision.Action,
 		"reason", decision.Reason,

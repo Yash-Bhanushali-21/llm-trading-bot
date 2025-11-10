@@ -86,6 +86,41 @@ func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...i
 	globalLogger.With(traceFields(ctx)...).Errorw(msg, args...)
 }
 
+// Middleware/Observability logger functions with additional caller skip
+// These functions skip extra frames to report the actual caller instead of the middleware wrapper
+
+// DebugSkip logs a debug message with additional caller skip (for middleware use)
+func DebugSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
+	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Debugw(msg, keysAndValues...)
+}
+
+// InfoSkip logs an info message with additional caller skip (for middleware use)
+func InfoSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
+	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Infow(msg, keysAndValues...)
+}
+
+// WarnSkip logs a warning message with additional caller skip (for middleware use)
+func WarnSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
+	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Warnw(msg, keysAndValues...)
+}
+
+// ErrorSkip logs an error message with additional caller skip (for middleware use)
+func ErrorSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
+	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Errorw(msg, keysAndValues...)
+}
+
+// ErrorWithErrSkip logs an error with error object with additional caller skip (for middleware use)
+func ErrorWithErrSkip(ctx context.Context, skip int, msg string, err error, keysAndValues ...interface{}) {
+	if trace.Enabled() {
+		if span := ottrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+	}
+	args := append([]interface{}{"error", err}, keysAndValues...)
+	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Errorw(msg, args...)
+}
+
 // Helper functions
 
 func traceFields(ctx context.Context) []interface{} {

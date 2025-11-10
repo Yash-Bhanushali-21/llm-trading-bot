@@ -30,15 +30,15 @@ func (ob *observableBroker) LTP(ctx context.Context, symbol string) (float64, er
 	ctx, span := trace.StartSpan(ctx, "broker.LTP")
 	defer span.End()
 
-	logger.Debug(ctx, "Fetching LTP", "symbol", symbol)
+	logger.DebugSkip(ctx, 1, "Fetching LTP", "symbol", symbol)
 
 	price, err := ob.broker.LTP(ctx, symbol)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to fetch LTP", err, "symbol", symbol)
+		logger.ErrorWithErrSkip(ctx, 1, "Failed to fetch LTP", err, "symbol", symbol)
 		return 0, err
 	}
 
-	logger.Debug(ctx, "LTP fetched successfully", "symbol", symbol, "price", price)
+	logger.DebugSkip(ctx, 1, "LTP fetched successfully", "symbol", symbol, "price", price)
 	return price, nil
 }
 
@@ -47,15 +47,15 @@ func (ob *observableBroker) RecentCandles(ctx context.Context, symbol string, n 
 	ctx, span := trace.StartSpan(ctx, "broker.RecentCandles")
 	defer span.End()
 
-	logger.Debug(ctx, "Fetching recent candles", "symbol", symbol, "count", n)
+	logger.DebugSkip(ctx, 1, "Fetching recent candles", "symbol", symbol, "count", n)
 
 	candles, err := ob.broker.RecentCandles(ctx, symbol, n)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to fetch candles", err, "symbol", symbol, "count", n)
+		logger.ErrorWithErrSkip(ctx, 1, "Failed to fetch candles", err, "symbol", symbol, "count", n)
 		return nil, err
 	}
 
-	logger.Debug(ctx, "Candles fetched successfully", "symbol", symbol, "count", len(candles))
+	logger.DebugSkip(ctx, 1, "Candles fetched successfully", "symbol", symbol, "count", len(candles))
 	return candles, nil
 }
 
@@ -64,7 +64,7 @@ func (ob *observableBroker) PlaceOrder(ctx context.Context, req types.OrderReq) 
 	ctx, span := trace.StartSpan(ctx, "broker.PlaceOrder")
 	defer span.End()
 
-	logger.Info(ctx, "Placing order",
+	logger.InfoSkip(ctx, 1, "Placing order",
 		"symbol", req.Symbol,
 		"side", req.Side,
 		"qty", req.Qty,
@@ -73,7 +73,7 @@ func (ob *observableBroker) PlaceOrder(ctx context.Context, req types.OrderReq) 
 
 	resp, err := ob.broker.PlaceOrder(ctx, req)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to place order", err,
+		logger.ErrorWithErrSkip(ctx, 1, "Failed to place order", err,
 			"symbol", req.Symbol,
 			"side", req.Side,
 			"qty", req.Qty,
@@ -81,7 +81,7 @@ func (ob *observableBroker) PlaceOrder(ctx context.Context, req types.OrderReq) 
 		return types.OrderResp{}, err
 	}
 
-	logger.Info(ctx, "Order placed successfully",
+	logger.InfoSkip(ctx, 1, "Order placed successfully",
 		"symbol", req.Symbol,
 		"order_id", resp.OrderID,
 		"status", resp.Status,
@@ -94,15 +94,15 @@ func (ob *observableBroker) Start(ctx context.Context, symbols []string) error {
 	ctx, span := trace.StartSpan(ctx, "broker.Start")
 	defer span.End()
 
-	logger.Info(ctx, "Starting broker", "symbols", symbols, "count", len(symbols))
+	logger.InfoSkip(ctx, 1, "Starting broker", "symbols", symbols, "count", len(symbols))
 
 	err := ob.broker.Start(ctx, symbols)
 	if err != nil {
-		logger.ErrorWithErr(ctx, "Failed to start broker", err, "symbols", symbols)
+		logger.ErrorWithErrSkip(ctx, 1, "Failed to start broker", err, "symbols", symbols)
 		return fmt.Errorf("broker start failed: %w", err)
 	}
 
-	logger.Info(ctx, "Broker started successfully", "symbols", symbols)
+	logger.InfoSkip(ctx, 1, "Broker started successfully", "symbols", symbols)
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (ob *observableBroker) Stop(ctx context.Context) {
 	ctx, span := trace.StartSpan(ctx, "broker.Stop")
 	defer span.End()
 
-	logger.Info(ctx, "Stopping broker")
+	logger.InfoSkip(ctx, 1, "Stopping broker")
 	ob.broker.Stop(ctx)
-	logger.Info(ctx, "Broker stopped successfully")
+	logger.InfoSkip(ctx, 1, "Broker stopped successfully")
 }
