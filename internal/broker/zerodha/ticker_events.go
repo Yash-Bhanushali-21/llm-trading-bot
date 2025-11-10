@@ -25,7 +25,7 @@ func (tm *tickerManager) setupEventHandlers() {
 // Event handlers
 
 func (tm *tickerManager) onConnect() {
-	logger.Info(context.Background(), "WebSocket connected successfully")
+	// Connection established
 }
 
 func (tm *tickerManager) onError(err error) {
@@ -40,10 +40,7 @@ func (tm *tickerManager) onClose(code int, reason string) {
 }
 
 func (tm *tickerManager) onReconnect(attempt int, delay time.Duration) {
-	logger.Info(context.Background(), "WebSocket reconnecting",
-		"attempt", attempt,
-		"delay", delay,
-	)
+	// Reconnecting to WebSocket
 }
 
 func (tm *tickerManager) onNoReconnect(attempt int) {
@@ -73,9 +70,5 @@ func (tm *tickerManager) onTick(tick models.Tick) {
 }
 
 func (tm *tickerManager) onOrderUpdate(order kiteconnect.Order) {
-	logger.Debug(context.Background(), "Order update received",
-		"order_id", order.OrderID,
-		"status", order.Status,
-		"symbol", order.TradingSymbol,
-	)
+	// Order update received via WebSocket
 }

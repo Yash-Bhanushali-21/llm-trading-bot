@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/types"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
@@ -57,7 +56,6 @@ func (tm *tickerManager) Start(ctx context.Context) error {
 
 	// Start the ticker in a goroutine
 	go func() {
-		logger.Info(ctx, "Starting Zerodha WebSocket ticker")
 		tm.ticker.Serve()
 	}()
 
@@ -67,7 +65,6 @@ func (tm *tickerManager) Start(ctx context.Context) error {
 // Stop closes the WebSocket connection gracefully
 func (tm *tickerManager) Stop(ctx context.Context) {
 	if tm.ticker != nil {
-		logger.Info(ctx, "Stopping Zerodha WebSocket ticker")
 		tm.ticker.Stop()
 	}
 }
@@ -100,11 +97,6 @@ func (tm *tickerManager) Subscribe(ctx context.Context, symbols []string) error 
 	if err := tm.ticker.SetMode(kiteticker.ModeFull, tokens); err != nil {
 		return fmt.Errorf("failed to set ticker mode: %w", err)
 	}
-
-	logger.Info(ctx, "Subscribed to symbols for live data",
-		"symbols", symbols,
-		"count", len(symbols),
-	)
 
 	return nil
 }
