@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"llm-trading-bot/internal/broker/brokerobs"
 	"llm-trading-bot/internal/broker/zerodha"
 	"llm-trading-bot/internal/engine"
 	"llm-trading-bot/internal/llm/claude"
+	"llm-trading-bot/internal/llm/llmobs"
 	"llm-trading-bot/internal/llm/noop"
 	"llm-trading-bot/internal/llm/openai"
 	"llm-trading-bot/internal/logger"
@@ -58,8 +60,9 @@ func compressOldLogs(ctx context.Context) {
 	}
 }
 
-// initializeBroker initializes and returns the broker instance
+// initializeBroker initializes and returns the broker instance with observability
 func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
+	// Create base broker
 	brk := zerodha.NewZerodha(zerodha.Params{
 		Mode:         cfg.Mode,
 		APIKey:       os.Getenv("KITE_API_KEY"),
@@ -68,6 +71,7 @@ func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
 		CandleSource: cfg.DataSource,
 	})
 
+	// Log initialization info
 	if cfg.Mode == "DRY_RUN" {
 		logger.Warn(ctx, "Running in DRY_RUN mode - orders will be simulated")
 	}
@@ -78,10 +82,11 @@ func initializeBroker(ctx context.Context, cfg *store.Config) zerodha.Broker {
 		logger.Info(ctx, "Using STATIC mock candle data for testing")
 	}
 
-	return brk
+	// Wrap with observability middleware
+	return brokerobs.Wrap(brk)
 }
 
-// initializeDecider initializes and returns the LLM decider
+// initializeDecider initializes and returns the LLM decider with observability
 func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 	var decider types.Decider
 
@@ -95,7 +100,8 @@ func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 		logger.Warn(ctx, "No LLM provider configured - using Noop decider (always HOLD)")
 	}
 
-	return decider
+	// Wrap with observability middleware
+	return llmobs.Wrap(decider)
 }
 
 // initializeEngine initializes and returns the trading engine

@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"time"
 
-	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/types"
 )
 
@@ -44,15 +43,13 @@ func NewZerodha(p Params) *Zerodha {
 
 // LTP returns the last traded price for a symbol
 func (z *Zerodha) LTP(ctx context.Context, symbol string) (float64, error) {
+	// Mock price for testing
 	price := 1000 + rand.Float64()*100
-	logger.Debug(ctx, "Fetched LTP", "symbol", symbol, "price", price)
 	return price, nil
 }
 
 // RecentCandles fetches the last n candles for a symbol
 func (z *Zerodha) RecentCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error) {
-	logger.Debug(ctx, "Fetching recent candles", "symbol", symbol, "count", n, "mode", z.p.Mode, "source", z.p.CandleSource)
-
 	// Route to appropriate data source
 	if z.p.CandleSource == "LIVE" {
 		return z.fetchLiveCandles(ctx, symbol, n)
@@ -82,27 +79,23 @@ func (z *Zerodha) fetchStaticCandles(ctx context.Context, symbol string, n int) 
 		})
 	}
 
-	logger.Debug(ctx, "Static candles generated", "symbol", symbol, "count", len(cs))
 	return cs, nil
 }
 
 // fetchLiveCandles fetches real-time candle data from WebSocket cache
 func (z *Zerodha) fetchLiveCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error) {
 	if z.tickerMgr == nil {
-		logger.Warn(ctx, "Ticker manager not initialized - using static data", "symbol", symbol)
+		// Fallback to static data if ticker not initialized
 		return z.fetchStaticCandles(ctx, symbol, n)
 	}
 
 	// Get candles from WebSocket cache
 	candles, err := z.tickerMgr.GetRecentCandles(symbol, n)
 	if err != nil {
-		logger.Warn(ctx, "Failed to fetch live candles from cache - using static data",
-			"symbol", symbol, "error", err.Error())
+		// Fallback to static data on error
 		return z.fetchStaticCandles(ctx, symbol, n)
 	}
 
-	logger.Debug(ctx, "Live candles fetched from WebSocket cache",
-		"symbol", symbol, "count", len(candles))
 	return candles, nil
 }
 
@@ -121,7 +114,7 @@ func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
 		return fmt.Errorf("failed to start ticker manager: %w", err)
 	}
 
-	// Wait a bit for connection to establish
+	// Wait for connection to establish
 	time.Sleep(2 * time.Second)
 
 	// Subscribe to symbols
@@ -130,7 +123,6 @@ func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
 	}
 
 	z.isTickerInit = true
-	logger.Info(ctx, "Zerodha broker started successfully", "symbols", symbols)
 	return nil
 }
 
@@ -144,21 +136,24 @@ func (z *Zerodha) Stop(ctx context.Context) {
 
 // PlaceOrder places an order and returns the order response
 func (z *Zerodha) PlaceOrder(ctx context.Context, req types.OrderReq) (types.OrderResp, error) {
-	logger.Debug(ctx, "Placing order", "symbol", req.Symbol, "side", req.Side, "qty", req.Qty, "tag", req.Tag, "mode", z.p.Mode)
-
+	// Simulate order in dry-run mode
 	if z.p.Mode == "DRY_RUN" {
-		resp := types.OrderResp{OrderID: fmt.Sprintf("SIM-%d", time.Now().UnixNano()), Status: "SIMULATED", Message: "dry-run"}
-		logger.Info(ctx, "Simulated order placed", "symbol", req.Symbol, "side", req.Side, "qty", req.Qty, "order_id", resp.OrderID)
-		return resp, nil
+		return types.OrderResp{
+			OrderID: fmt.Sprintf("SIM-%d", time.Now().UnixNano()),
+			Status:  "SIMULATED",
+			Message: "dry-run",
+		}, nil
 	}
 
+	// Validate credentials for live orders
 	if z.p.APIKey == "" || z.p.AccessToken == "" {
-		err := errors.New("missing API key/access token")
-		logger.ErrorWithErr(ctx, "Cannot place live order - missing credentials", err, "symbol", req.Symbol)
-		return types.OrderResp{}, err
+		return types.OrderResp{}, errors.New("missing API key/access token")
 	}
 
-	resp := types.OrderResp{OrderID: fmt.Sprintf("LIVE-%d", time.Now().UnixNano()), Status: "PLACED", Message: "ok"}
-	logger.Info(ctx, "Live order placed", "symbol", req.Symbol, "side", req.Side, "qty", req.Qty, "order_id", resp.OrderID)
-	return resp, nil
+	// TODO: Implement actual Zerodha API order placement
+	return types.OrderResp{
+		OrderID: fmt.Sprintf("LIVE-%d", time.Now().UnixNano()),
+		Status:  "PLACED",
+		Message: "ok",
+	}, nil
 }
