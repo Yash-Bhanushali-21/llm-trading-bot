@@ -14,7 +14,7 @@ import (
 type Engine struct {
 	cfg      *store.Config
 	broker   interfaces.Broker
-	llm      types.Decider
+	llm      interfaces.Decider
 	dayStart time.Time
 
 	positions *positionManager
@@ -23,7 +23,7 @@ type Engine struct {
 	executor  *orderExecutor
 }
 
-func newEngine(cfg *store.Config, brk interfaces.Broker, d types.Decider) *Engine {
+func newEngine(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) *Engine {
 	return &Engine{
 		cfg:      cfg,
 		broker:   brk,

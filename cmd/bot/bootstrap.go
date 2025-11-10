@@ -20,7 +20,6 @@ import (
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/tradelog"
-	"llm-trading-bot/internal/types"
 
 	"github.com/joho/godotenv"
 )
@@ -94,8 +93,8 @@ func initializeBroker(ctx context.Context, cfg *store.Config) interfaces.Broker 
 }
 
 // initializeDecider initializes and returns the LLM decider with observability
-func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
-	var decider types.Decider
+func initializeDecider(ctx context.Context, cfg *store.Config) interfaces.Decider {
+	var decider interfaces.Decider
 
 	switch cfg.LLM.Provider {
 	case "OPENAI":
@@ -112,7 +111,7 @@ func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 }
 
 // initializeEngine initializes and returns the trading engine with observability
-func initializeEngine(cfg *store.Config, brk interfaces.Broker, decider types.Decider) interfaces.Engine {
+func initializeEngine(cfg *store.Config, brk interfaces.Broker, decider interfaces.Decider) interfaces.Engine {
 	// Create base engine
 	eng := engine.New(cfg, brk, decider)
 

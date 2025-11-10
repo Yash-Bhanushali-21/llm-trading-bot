@@ -3,6 +3,7 @@ package llmobs
 import (
 	"context"
 
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/types"
@@ -10,14 +11,14 @@ import (
 
 // observableDecider wraps a Decider with observability (logging & tracing)
 type observableDecider struct {
-	decider types.Decider
+	decider interfaces.Decider
 }
 
 // Compile-time interface check
-var _ types.Decider = (*observableDecider)(nil)
+var _ interfaces.Decider = (*observableDecider)(nil)
 
 // Wrap wraps a decider with observability middleware
-func Wrap(decider types.Decider) types.Decider {
+func Wrap(decider interfaces.Decider) interfaces.Decider {
 	return &observableDecider{
 		decider: decider,
 	}
