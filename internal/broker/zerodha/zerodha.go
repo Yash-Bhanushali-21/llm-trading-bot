@@ -22,12 +22,21 @@ type Params struct {
 
 // Zerodha implements the Broker interface for Zerodha broker
 type Zerodha struct {
-	p Params
+	p            Params
+	tickerMgr    *tickerManager
+	isTickerInit bool
 }
 
 // NewZerodha creates a new Zerodha broker instance
 func NewZerodha(p Params) *Zerodha {
-	return &Zerodha{p: p}
+	z := &Zerodha{p: p}
+
+	// Initialize ticker manager for live data mode
+	if p.CandleSource == "LIVE" {
+		z.tickerMgr = newTickerManager(p.APIKey, p.AccessToken, p.Exchange)
+	}
+
+	return z
 }
 
 // LTP returns the last traded price for a symbol
@@ -74,12 +83,60 @@ func (z *Zerodha) fetchStaticCandles(ctx context.Context, symbol string, n int) 
 	return cs, nil
 }
 
-// fetchLiveCandles fetches real-time candle data from Zerodha API
+// fetchLiveCandles fetches real-time candle data from WebSocket cache
 func (z *Zerodha) fetchLiveCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error) {
-	// TODO: Implement Zerodha Kite Connect API integration
-	// For now, return error to indicate it's not implemented
-	logger.Warn(ctx, "Live candle fetching not yet implemented - using static data", "symbol", symbol)
-	return z.fetchStaticCandles(ctx, symbol, n)
+	if z.tickerMgr == nil {
+		logger.Warn(ctx, "Ticker manager not initialized - using static data", "symbol", symbol)
+		return z.fetchStaticCandles(ctx, symbol, n)
+	}
+
+	// Get candles from WebSocket cache
+	candles, err := z.tickerMgr.getRecentCandles(symbol, n)
+	if err != nil {
+		logger.Warn(ctx, "Failed to fetch live candles from cache - using static data",
+			"symbol", symbol, "error", err.Error())
+		return z.fetchStaticCandles(ctx, symbol, n)
+	}
+
+	logger.Debug(ctx, "Live candles fetched from WebSocket cache",
+		"symbol", symbol, "count", len(candles))
+	return candles, nil
+}
+
+// Start initializes the WebSocket connection and subscribes to symbols
+func (z *Zerodha) Start(ctx context.Context, symbols []string) error {
+	if z.tickerMgr == nil {
+		return nil // Not in live mode, nothing to start
+	}
+
+	if z.isTickerInit {
+		return nil // Already started
+	}
+
+	// Start WebSocket connection
+	if err := z.tickerMgr.start(ctx); err != nil {
+		return fmt.Errorf("failed to start ticker manager: %w", err)
+	}
+
+	// Wait a bit for connection to establish
+	time.Sleep(2 * time.Second)
+
+	// Subscribe to symbols
+	if err := z.tickerMgr.subscribe(ctx, symbols); err != nil {
+		return fmt.Errorf("failed to subscribe to symbols: %w", err)
+	}
+
+	z.isTickerInit = true
+	logger.Info(ctx, "Zerodha broker started successfully", "symbols", symbols)
+	return nil
+}
+
+// Stop closes the WebSocket connection
+func (z *Zerodha) Stop(ctx context.Context) {
+	if z.tickerMgr != nil {
+		z.tickerMgr.stop(ctx)
+		z.isTickerInit = false
+	}
 }
 
 // PlaceOrder places an order and returns the order response

@@ -16,4 +16,10 @@ type Broker interface {
 
 	// PlaceOrder places an order and returns the order response
 	PlaceOrder(ctx context.Context, req types.OrderReq) (types.OrderResp, error)
+
+	// Start initializes the broker (e.g., WebSocket connections for live data)
+	Start(ctx context.Context, symbols []string) error
+
+	// Stop gracefully shuts down the broker connections
+	Stop(ctx context.Context)
 }

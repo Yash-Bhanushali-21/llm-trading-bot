@@ -57,6 +57,13 @@ func main() {
 	decider := initializeDecider(ctx, cfg)
 	eng := initializeEngine(cfg, brk, decider)
 
+	// Start broker (WebSocket connections if in LIVE mode)
+	if err := brk.Start(ctx, cfg.UniverseStatic); err != nil {
+		logger.ErrorWithErr(ctx, "Failed to start broker", err)
+		os.Exit(1)
+	}
+	defer brk.Stop(ctx)
+
 	// Setup tickers
 	tick := time.NewTicker(time.Duration(cfg.PollSeconds) * time.Second)
 	defer tick.Stop()
@@ -110,6 +117,10 @@ func main() {
 		case <-sigc:
 			shutdownCtx, shutdownSpan := trace.StartSpan(ctx, "graceful-shutdown")
 			logger.Info(shutdownCtx, "Shutdown signal received - gracefully shutting down")
+
+			// Stop broker connections
+			logger.Info(shutdownCtx, "Stopping broker connections")
+			brk.Stop(shutdownCtx)
 
 			// Generate final EOD summary
 			logger.Info(shutdownCtx, "Generating final end-of-day summary")
