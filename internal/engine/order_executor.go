@@ -3,37 +3,24 @@ package engine
 import (
 	"context"
 
-	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/tradelog"
 	"llm-trading-bot/internal/types"
 )
 
-// orderExecutor handles order placement and trade logging.
 type orderExecutor struct {
-	broker zerodha.Broker
+	broker interfaces.Broker
 }
 
-// newOrderExecutor creates a new order executor.
-func newOrderExecutor(broker zerodha.Broker) *orderExecutor {
+func newOrderExecutor(broker interfaces.Broker) *orderExecutor {
 	return &orderExecutor{
 		broker: broker,
 	}
 }
 
-// placeBuyOrder executes a BUY order and logs the trade.
 //
-// Parameters:
-//   - ctx: Context for logging and tracing
-//   - symbol: Trading symbol
-//   - qty: Quantity to buy
-//   - price: Current market price
-//   - reason: Reason for the trade
-//   - confidence: LLM confidence level
 //
-// Returns:
-//   - resp: Order response from broker
-//   - err: Error if order placement failed
 func (oe *orderExecutor) placeBuyOrder(ctx context.Context, symbol string, qty int, price float64, reason string, confidence float64) (types.OrderResp, error) {
 	req := types.OrderReq{
 		Symbol: symbol,
@@ -52,18 +39,7 @@ func (oe *orderExecutor) placeBuyOrder(ctx context.Context, symbol string, qty i
 		return types.OrderResp{}, err
 	}
 
-	// Log successful trade
-	logger.Info(ctx, "Trade executed",
-		"symbol", symbol,
-		"side", "BUY",
-		"qty", qty,
-		"price", price,
-		"order_id", resp.OrderID,
-		"tag", "LLM",
-		"confidence", confidence,
-	)
 
-	// Append to trade log
 	_ = tradelog.Append(tradelog.Entry{
 		Symbol:     symbol,
 		Side:       "BUY",
@@ -77,20 +53,8 @@ func (oe *orderExecutor) placeBuyOrder(ctx context.Context, symbol string, qty i
 	return resp, nil
 }
 
-// placeSellOrder executes a SELL order and logs the trade.
 //
-// Parameters:
-//   - ctx: Context for logging and tracing
-//   - symbol: Trading symbol
-//   - qty: Quantity to sell
-//   - price: Current market price
-//   - reason: Reason for the trade
-//   - confidence: LLM confidence level
-//   - tag: Order tag ("LLM" or "SL" for stop-loss)
 //
-// Returns:
-//   - resp: Order response from broker
-//   - err: Error if order placement failed
 func (oe *orderExecutor) placeSellOrder(ctx context.Context, symbol string, qty int, price float64, reason string, confidence float64, tag string) (types.OrderResp, error) {
 	req := types.OrderReq{
 		Symbol: symbol,
@@ -109,18 +73,7 @@ func (oe *orderExecutor) placeSellOrder(ctx context.Context, symbol string, qty 
 		return types.OrderResp{}, err
 	}
 
-	// Log successful trade
-	logger.Info(ctx, "Trade executed",
-		"symbol", symbol,
-		"side", "SELL",
-		"qty", qty,
-		"price", price,
-		"order_id", resp.OrderID,
-		"tag", tag,
-		"confidence", confidence,
-	)
 
-	// Append to trade log
 	_ = tradelog.Append(tradelog.Entry{
 		Symbol:     symbol,
 		Side:       "SELL",
@@ -134,14 +87,7 @@ func (oe *orderExecutor) placeSellOrder(ctx context.Context, symbol string, qty 
 	return resp, nil
 }
 
-// logDecision logs the LLM trading decision to the decision log.
 func (oe *orderExecutor) logDecision(ctx context.Context, symbol string, decision types.Decision, price float64, indicators types.Indicators) {
-	logger.Info(ctx, "Trading decision",
-		"symbol", symbol,
-		"action", decision.Action,
-		"confidence", decision.Confidence,
-		"reason", decision.Reason,
-	)
 
 	_ = tradelog.AppendDecision(tradelog.DecisionEntry{
 		Symbol:     symbol,

@@ -1,7 +1,5 @@
 package types
 
-import "context"
-
 type Candle struct {
 	Ts                          int64
 	Open, High, Low, Close, Vol float64
@@ -17,9 +15,7 @@ type Decision struct {
 	Confidence     float64 `json:"confidence"`
 	Qty            int     `json:"qty,omitempty"`
 }
-type Decider interface {
-	Decide(ctx context.Context, symbol string, latest Candle, inds Indicators, contextData map[string]any) (Decision, error)
-}
+
 type StepResult struct {
 	Symbol   string      `json:"symbol"`
 	Decision Decision    `json:"decision"`

@@ -5,36 +5,31 @@ import (
 	"errors"
 	"time"
 
-	"llm-trading-bot/internal/broker/zerodha"
+	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/types"
 )
 
-// Engine is the main trading engine that orchestrates all components.
 type Engine struct {
 	cfg      *store.Config
-	broker   zerodha.Broker
-	llm      types.Decider
+	broker   interfaces.Broker
+	llm      interfaces.Decider
 	dayStart time.Time
 
-	// Decoupled components
 	positions *positionManager
 	risk      *riskManager
 	stop      *stopManager
 	executor  *orderExecutor
 }
 
-// newEngine creates a new Engine instance (internal constructor).
-// Use New() function instead to get IEngine interface.
-func newEngine(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
+func newEngine(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) *Engine {
 	return &Engine{
 		cfg:      cfg,
 		broker:   brk,
 		llm:      d,
 		dayStart: midnightIST(),
 
-		// Initialize components
 		positions: newPositionManager(),
 		risk:      newRiskManager(),
 		stop: newStopManager(
@@ -48,17 +43,17 @@ func newEngine(cfg *store.Config, brk zerodha.Broker, d types.Decider) *Engine {
 	}
 }
 
-// Step executes one complete trading cycle for a symbol.
-func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
-	logger.Debug(ctx, "Starting trading step", "symbol", symbol)
+func New(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) interfaces.Engine {
+	return newEngine(cfg, brk, d)
+}
 
-	// 1. Fetch market data
+func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
+
 	candles, err := e.fetchCandles(ctx, symbol)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Calculate indicators
 	indicators := calculateIndicators(candles, struct {
 		SMAWindows []int
 		RSIPeriod  int
@@ -77,14 +72,11 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 
 	latest := candles[len(candles)-1]
 	price := latest.Close
-	logger.Debug(ctx, "Current market state", "symbol", symbol, "price", price, "timestamp", latest.Ts)
 
-	// 3. Check stop-loss trigger
 	if result := e.handleStopLoss(ctx, symbol, price, latest.Ts); result != nil {
 		return result, nil
 	}
 
-	// 4. Get LLM decision
 	decision, err := e.llm.Decide(ctx, symbol, latest, indicators, map[string]any{
 		"price": price,
 		"risk":  e.cfg.Risk,
@@ -94,10 +86,8 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		return nil, err
 	}
 
-	// Log decision
 	e.executor.logDecision(ctx, symbol, decision, price, indicators)
 
-	// 5. Determine quantity
 	qty := pickQuantity(symbol, decision, struct {
 		PerSymbol   map[string]int
 		DefaultBuy  int
@@ -108,15 +98,11 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		DefaultSell: e.cfg.Qty.DefaultSell,
 	})
 
-	logger.Debug(ctx, "Position sizing determined", "symbol", symbol, "action", decision.Action, "qty", qty)
 
-	// 6. Execute trading action
 	orders, reason := e.executeDecision(ctx, symbol, decision, qty, price, indicators.ATR)
 
-	// 7. Update trailing stop if enabled
 	e.updateTrailingStop(ctx, symbol, price, indicators.ATR)
 
-	logger.Debug(ctx, "Trading step completed", "symbol", symbol, "action", decision.Action, "orders", len(orders))
 
 	return &types.StepResult{
 		Symbol:   symbol,
@@ -128,7 +114,6 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 	}, nil
 }
 
-// fetchCandles retrieves recent candle data from the broker.
 func (e *Engine) fetchCandles(ctx context.Context, symbol string) ([]types.Candle, error) {
 	candles, err := e.broker.RecentCandles(ctx, symbol, 250)
 	if err != nil {
@@ -136,7 +121,6 @@ func (e *Engine) fetchCandles(ctx context.Context, symbol string) ([]types.Candl
 		return nil, err
 	}
 
-	logger.Debug(ctx, "Candles fetched successfully", "symbol", symbol, "count", len(candles))
 
 	if len(candles) < 50 {
 		err := errors.New("not enough candles")
@@ -147,22 +131,9 @@ func (e *Engine) fetchCandles(ctx context.Context, symbol string) ([]types.Candl
 	return candles, nil
 }
 
-// logIndicators logs calculated indicator values for debugging.
 func (e *Engine) logIndicators(ctx context.Context, symbol string, inds types.Indicators) {
-	logger.Debug(ctx, "Indicators calculated",
-		"symbol", symbol,
-		"rsi", inds.RSI,
-		"sma20", inds.SMA[20],
-		"sma50", inds.SMA[50],
-		"sma200", inds.SMA[200],
-		"bb_upper", inds.BB.Upper,
-		"bb_middle", inds.BB.Middle,
-		"bb_lower", inds.BB.Lower,
-		"atr", inds.ATR,
-	)
 }
 
-// handleStopLoss checks and executes stop-loss if triggered.
 func (e *Engine) handleStopLoss(ctx context.Context, symbol string, price float64, timestamp int64) *types.StepResult {
 	pos := e.positions.get(symbol)
 	if pos == nil || pos.qty <= 0 {
@@ -173,14 +144,12 @@ func (e *Engine) handleStopLoss(ctx context.Context, symbol string, price float6
 		return nil
 	}
 
-	// Stop-loss triggered - place SELL order
 	resp, err := e.executor.placeSellOrder(ctx, symbol, pos.qty, price, "STOP_LOSS", 1.0, "SL")
 	if err != nil {
 		logger.ErrorWithErr(ctx, "Failed to execute stop-loss order", err, "symbol", symbol, "qty", pos.qty, "price", price)
 		return nil
 	}
 
-	// Close position
 	e.positions.close(symbol)
 
 	return &types.StepResult{
@@ -192,7 +161,6 @@ func (e *Engine) handleStopLoss(ctx context.Context, symbol string, price float6
 	}
 }
 
-// executeDecision executes the trading decision (BUY/SELL/HOLD).
 func (e *Engine) executeDecision(ctx context.Context, symbol string, decision types.Decision, qty int, price, atr float64) ([]types.OrderResp, string) {
 	orders := []types.OrderResp{}
 	reason := decision.Reason
@@ -203,16 +171,13 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 			return orders, reason
 		}
 
-		logger.Debug(ctx, "Processing BUY decision", "symbol", symbol, "qty", qty, "price", price)
 
-		// Risk check
 		riskExceeded, _ := e.risk.validateTrade(ctx, symbol, price, qty, e.cfg.Risk.PerTradeRiskPct)
 		if riskExceeded {
 			reason += " | blocked: risk cap"
 			return orders, reason
 		}
 
-		// Place order
 		resp, err := e.executor.placeBuyOrder(ctx, symbol, qty, price, decision.Reason, decision.Confidence)
 		if err != nil {
 			reason += " | order_err:" + err.Error()
@@ -221,10 +186,8 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 
 		orders = append(orders, resp)
 
-		// Calculate stop-loss
 		stopPrice := e.stop.calculateStopPrice(price, atr)
 
-		// Update position
 		e.positions.addBuy(ctx, symbol, qty, price, atr, stopPrice)
 
 	case "SELL":
@@ -232,9 +195,7 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 			return orders, reason
 		}
 
-		logger.Debug(ctx, "Processing SELL decision", "symbol", symbol, "qty", qty, "price", price)
 
-		// Place order
 		resp, err := e.executor.placeSellOrder(ctx, symbol, qty, price, decision.Reason, decision.Confidence, "LLM")
 		if err != nil {
 			reason += " | order_err:" + err.Error()
@@ -243,17 +204,14 @@ func (e *Engine) executeDecision(ctx context.Context, symbol string, decision ty
 
 		orders = append(orders, resp)
 
-		// Update position
 		e.positions.reduceSell(ctx, symbol, qty, price)
 
 	case "HOLD":
-		logger.Debug(ctx, "HOLD decision - no action taken", "symbol", symbol, "reason", decision.Reason)
 	}
 
 	return orders, reason
 }
 
-// updateTrailingStop updates the trailing stop-loss if enabled.
 func (e *Engine) updateTrailingStop(ctx context.Context, symbol string, price, atr float64) {
 	if !e.stop.isTrailingEnabled() {
 		return

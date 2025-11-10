@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	Mode           string   `yaml:"mode"`
+	DataSource     string   `yaml:"data_source"`
 	PollSeconds    int      `yaml:"poll_seconds"`
 	Exchange       string   `yaml:"exchange"`
 	UniverseStatic []string `yaml:"universe_static"`
@@ -46,10 +47,12 @@ type Config struct {
 	} `yaml:"llm"`
 }
 
-// Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Mode != "DRY_RUN" && c.Mode != "LIVE" {
 		return fmt.Errorf("invalid mode '%s': must be 'DRY_RUN' or 'LIVE'", c.Mode)
+	}
+	if c.DataSource != "STATIC" && c.DataSource != "LIVE" {
+		return fmt.Errorf("invalid data_source '%s': must be 'STATIC' or 'LIVE'", c.DataSource)
 	}
 	if len(c.UniverseStatic) == 0 {
 		return errors.New("universe_static cannot be empty")
@@ -73,12 +76,13 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Set defaults
 	if c.PollSeconds == 0 {
 		c.PollSeconds = 15
 	}
+	if c.DataSource == "" {
+		c.DataSource = "STATIC"
+	}
 
-	// Validate configuration
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
