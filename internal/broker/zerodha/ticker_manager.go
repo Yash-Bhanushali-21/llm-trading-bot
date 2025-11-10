@@ -3,6 +3,7 @@ package zerodha
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"llm-trading-bot/internal/logger"
@@ -13,8 +14,8 @@ import (
 )
 
 const (
-	// defaultCandleBufferSize is the default number of candles to store per symbol
-	defaultCandleBufferSize = 200
+	// maxCandlesPerSymbol is the maximum number of candles to store per symbol
+	maxCandlesPerSymbol = 200
 
 	// connectionWaitTime is how long to wait for WebSocket connection to establish
 	connectionWaitTime = 2 * time.Second
@@ -28,9 +29,12 @@ type tickerManager struct {
 	accessToken string
 	exchange    string
 
-	// Modular components
-	cache  *candleCache
-	mapper *instrumentMapper
+	// Symbol to candles mapping
+	candles map[string][]types.Candle
+	mu      sync.RWMutex
+
+	// Token to symbol mapping for fast lookup
+	tokenToSymbol map[uint32]string
 }
 
 // Start initializes and starts the WebSocket connection
@@ -64,10 +68,21 @@ func (tm *tickerManager) Stop(ctx context.Context) {
 
 // Subscribe subscribes to symbols for live data streaming
 func (tm *tickerManager) Subscribe(ctx context.Context, symbols []string) error {
-	// Get instrument tokens for symbols
-	tokens, err := tm.resolveInstrumentTokens(ctx, symbols)
-	if err != nil {
-		return fmt.Errorf("failed to resolve instrument tokens: %w", err)
+	tokens := make([]uint32, 0, len(symbols))
+
+	for _, symbol := range symbols {
+		// Get placeholder token (TODO: replace with actual API call)
+		token := tm.getPlaceholderToken(symbol)
+
+		// Add mapping
+		tm.tokenToSymbol[token] = symbol
+
+		// Initialize candle slice
+		tm.mu.Lock()
+		tm.candles[symbol] = make([]types.Candle, 0, maxCandlesPerSymbol)
+		tm.mu.Unlock()
+
+		tokens = append(tokens, token)
 	}
 
 	// Subscribe to tokens
@@ -90,34 +105,40 @@ func (tm *tickerManager) Subscribe(ctx context.Context, symbols []string) error 
 
 // GetRecentCandles retrieves recent candles from cache
 func (tm *tickerManager) GetRecentCandles(symbol string, n int) ([]types.Candle, error) {
-	return tm.cache.getRecent(symbol, n)
-}
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
 
-// resolveInstrumentTokens resolves symbols to instrument tokens
-func (tm *tickerManager) resolveInstrumentTokens(ctx context.Context, symbols []string) ([]uint32, error) {
-	// TODO: Implement actual instrument token lookup from Kite API
-	// For now, using placeholder tokens for development
-	tokens := make([]uint32, 0, len(symbols))
-
-	for _, symbol := range symbols {
-		// Placeholder token mapping (replace with actual API call)
-		token := tm.getPlaceholderToken(symbol)
-
-		// Add mapping for bidirectional lookup
-		tm.mapper.addMapping(symbol, token)
-
-		// Initialize candle buffer for this symbol
-		tm.cache.initBuffer(symbol, defaultCandleBufferSize)
-
-		tokens = append(tokens, token)
+	symbolCandles, exists := tm.candles[symbol]
+	if !exists {
+		return nil, fmt.Errorf("no candle data for symbol %s", symbol)
 	}
 
-	logger.Debug(ctx, "Resolved instrument tokens",
-		"symbols", symbols,
-		"tokens", tokens,
-	)
+	if len(symbolCandles) == 0 {
+		return nil, fmt.Errorf("no candles available for %s", symbol)
+	}
 
-	return tokens, nil
+	// Return last n candles
+	if len(symbolCandles) < n {
+		return symbolCandles, nil
+	}
+
+	return symbolCandles[len(symbolCandles)-n:], nil
+}
+
+// addCandle adds a candle to the symbol's buffer (internal use)
+func (tm *tickerManager) addCandle(symbol string, candle types.Candle) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	symbolCandles := tm.candles[symbol]
+	symbolCandles = append(symbolCandles, candle)
+
+	// Maintain max buffer size
+	if len(symbolCandles) > maxCandlesPerSymbol {
+		symbolCandles = symbolCandles[1:]
+	}
+
+	tm.candles[symbol] = symbolCandles
 }
 
 // getPlaceholderToken returns a placeholder token for a symbol

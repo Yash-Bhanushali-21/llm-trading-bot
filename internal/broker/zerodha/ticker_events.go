@@ -22,7 +22,7 @@ func (tm *tickerManager) setupEventHandlers() {
 	tm.ticker.OnOrderUpdate(tm.onOrderUpdate)
 }
 
-// Event handler implementations
+// Event handlers
 
 func (tm *tickerManager) onConnect() {
 	logger.Info(context.Background(), "WebSocket connected successfully")
@@ -53,32 +53,14 @@ func (tm *tickerManager) onNoReconnect(attempt int) {
 }
 
 func (tm *tickerManager) onTick(tick models.Tick) {
-	symbol := tm.mapper.getSymbol(tick.InstrumentToken)
-	if symbol == "" {
+	// Get symbol from token
+	symbol, exists := tm.tokenToSymbol[tick.InstrumentToken]
+	if !exists {
 		return
 	}
 
-	// Convert tick to candle format
-	candle := tm.convertTickToCandle(tick)
-
-	// Add to candle cache
-	tm.cache.addCandle(symbol, candle)
-}
-
-func (tm *tickerManager) onOrderUpdate(order kiteconnect.Order) {
-	// Order updates can be logged if needed
-	logger.Debug(context.Background(), "Order update received",
-		"order_id", order.OrderID,
-		"status", order.Status,
-		"symbol", order.TradingSymbol,
-	)
-}
-
-// convertTickToCandle converts a WebSocket tick to candle format
-func (tm *tickerManager) convertTickToCandle(tick models.Tick) types.Candle {
-	// TODO: Aggregate ticks into proper 1-minute candles
-	// For now, treat each tick as a candle point
-	return types.Candle{
+	// Convert tick to candle and add to cache
+	candle := types.Candle{
 		Ts:    tick.Timestamp.Time.Unix(),
 		Open:  tick.OHLC.Open,
 		High:  tick.OHLC.High,
@@ -86,4 +68,14 @@ func (tm *tickerManager) convertTickToCandle(tick models.Tick) types.Candle {
 		Close: tick.LastPrice,
 		Vol:   float64(tick.VolumeTraded),
 	}
+
+	tm.addCandle(symbol, candle)
+}
+
+func (tm *tickerManager) onOrderUpdate(order kiteconnect.Order) {
+	logger.Debug(context.Background(), "Order update received",
+		"order_id", order.OrderID,
+		"status", order.Status,
+		"symbol", order.TradingSymbol,
+	)
 }

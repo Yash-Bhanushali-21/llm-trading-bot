@@ -24,10 +24,10 @@ type TickerManager interface {
 // newTickerManager creates a new WebSocket ticker manager instance
 func newTickerManager(apiKey, accessToken, exchange string) TickerManager {
 	return &tickerManager{
-		apiKey:      apiKey,
-		accessToken: accessToken,
-		exchange:    exchange,
-		cache:       newCandleCache(),
-		mapper:      newInstrumentMapper(),
+		apiKey:        apiKey,
+		accessToken:   accessToken,
+		exchange:      exchange,
+		candles:       make(map[string][]types.Candle),
+		tokenToSymbol: make(map[uint32]string),
 	}
 }
