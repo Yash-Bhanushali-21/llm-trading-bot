@@ -42,7 +42,7 @@ func (z *Zerodha) RecentCandles(ctx context.Context, symbol string, n int) ([]ty
 	logger.Debug(ctx, "Fetching recent candles", "symbol", symbol, "count", n, "mode", z.p.Mode, "source", z.p.CandleSource)
 
 	// Route to appropriate data source
-	if z.p.CandleSource == "live" {
+	if z.p.CandleSource == "LIVE" {
 		return z.fetchLiveCandles(ctx, symbol, n)
 	}
 

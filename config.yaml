@@ -2,6 +2,7 @@
 # ⚙️  GENERAL SETTINGS
 # ───────────────────────────────
 mode: DRY_RUN          # DRY_RUN | LIVE
+data_source: STATIC    # STATIC | LIVE (candle data source)
 poll_seconds: 120     # how often bot checks signals
 exchange: NSE
 
