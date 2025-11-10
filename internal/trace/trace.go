@@ -18,7 +18,6 @@ var (
 	enabled        bool
 )
 
-// Init initializes OpenTelemetry tracing
 func Init() error {
 	enabled = getEnv("LOG_TRACING_ENABLED", "true") == "true"
 	if !enabled {
@@ -50,7 +49,6 @@ func Init() error {
 	return nil
 }
 
-// Shutdown gracefully shuts down the tracer provider
 func Shutdown(ctx context.Context) error {
 	if tracerProvider != nil {
 		return tracerProvider.Shutdown(ctx)
@@ -58,7 +56,6 @@ func Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// StartSpan starts a new OpenTelemetry span
 func StartSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	if !enabled || tracer == nil {
 		return ctx, trace.SpanFromContext(ctx)
@@ -66,12 +63,10 @@ func StartSpan(ctx context.Context, spanName string, opts ...trace.SpanStartOpti
 	return tracer.Start(ctx, spanName, opts...)
 }
 
-// Enabled returns whether tracing is enabled
 func Enabled() bool {
 	return enabled
 }
 
-// GetTraceFields returns trace_id and span_id from context
 func GetTraceFields(ctx context.Context) (traceID, spanID string, ok bool) {
 	if !enabled {
 		return "", "", false

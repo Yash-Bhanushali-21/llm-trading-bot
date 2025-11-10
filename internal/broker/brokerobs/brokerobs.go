@@ -22,7 +22,6 @@ func Wrap(broker interfaces.Broker) interfaces.Broker {
 	}
 }
 
-// LTP returns the last traded price with observability
 func (ob *observableBroker) LTP(ctx context.Context, symbol string) (float64, error) {
 	ctx, span := trace.StartSpan(ctx, "broker.LTP")
 	defer span.End()
@@ -39,7 +38,6 @@ func (ob *observableBroker) LTP(ctx context.Context, symbol string) (float64, er
 	return price, nil
 }
 
-// RecentCandles fetches candles with observability
 func (ob *observableBroker) RecentCandles(ctx context.Context, symbol string, n int) ([]types.Candle, error) {
 	ctx, span := trace.StartSpan(ctx, "broker.RecentCandles")
 	defer span.End()
@@ -56,7 +54,6 @@ func (ob *observableBroker) RecentCandles(ctx context.Context, symbol string, n 
 	return candles, nil
 }
 
-// PlaceOrder places an order with observability
 func (ob *observableBroker) PlaceOrder(ctx context.Context, req types.OrderReq) (types.OrderResp, error) {
 	ctx, span := trace.StartSpan(ctx, "broker.PlaceOrder")
 	defer span.End()
@@ -86,7 +83,6 @@ func (ob *observableBroker) PlaceOrder(ctx context.Context, req types.OrderReq) 
 	return resp, nil
 }
 
-// Start initializes the broker with observability
 func (ob *observableBroker) Start(ctx context.Context, symbols []string) error {
 	ctx, span := trace.StartSpan(ctx, "broker.Start")
 	defer span.End()
@@ -103,7 +99,6 @@ func (ob *observableBroker) Start(ctx context.Context, symbols []string) error {
 	return nil
 }
 
-// Stop shuts down the broker with observability
 func (ob *observableBroker) Stop(ctx context.Context) {
 	ctx, span := trace.StartSpan(ctx, "broker.Stop")
 	defer span.End()

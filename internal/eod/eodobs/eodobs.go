@@ -21,28 +21,23 @@ func Wrap(summarizer interfaces.EodSummarizer) interfaces.EodSummarizer {
 	}
 }
 
-// SummarizeDay generates end-of-day summary with observability
 func (oes *observableEodSummarizer) SummarizeDay(t time.Time) (string, error) {
 	ctx := context.Background()
 	ctx, span := trace.StartSpan(ctx, "eod.SummarizeDay")
 	defer span.End()
 
-	// Use InfoSkip(1) to report the actual caller, not this middleware wrapper
 	logger.InfoSkip(ctx, 1, "Starting EOD summary generation",
 		"date", t.Format("2006-01-02"),
 	)
 
-	// Call underlying summarizer
 	csvPath, err := oes.summarizer.SummarizeDay(t)
 	if err != nil {
-		// Use ErrorWithErrSkip(1) to report the actual caller
 		logger.ErrorWithErrSkip(ctx, 1, "EOD summary generation failed", err,
 			"date", t.Format("2006-01-02"),
 		)
 		return "", err
 	}
 
-	// No trades for the day
 	if csvPath == "" {
 		logger.InfoSkip(ctx, 1, "No trades found for EOD summary",
 			"date", t.Format("2006-01-02"),
@@ -50,7 +45,6 @@ func (oes *observableEodSummarizer) SummarizeDay(t time.Time) (string, error) {
 		return "", nil
 	}
 
-	// Log successful summary generation
 	logger.InfoSkip(ctx, 1, "EOD summary generated successfully",
 		"date", t.Format("2006-01-02"),
 		"csv_path", csvPath,
@@ -59,7 +53,6 @@ func (oes *observableEodSummarizer) SummarizeDay(t time.Time) (string, error) {
 	return csvPath, nil
 }
 
-// SummarizeToday generates today's EOD summary with observability
 func (oes *observableEodSummarizer) SummarizeToday() (string, error) {
 	ctx := context.Background()
 	ctx, span := trace.StartSpan(ctx, "eod.SummarizeToday")
@@ -85,7 +78,6 @@ func (oes *observableEodSummarizer) SummarizeToday() (string, error) {
 	return csvPath, nil
 }
 
-// ShouldRunNow checks if EOD should run with observability
 func (oes *observableEodSummarizer) ShouldRunNow() (bool, string) {
 	ctx := context.Background()
 	ctx, span := trace.StartSpan(ctx, "eod.ShouldRunNow")

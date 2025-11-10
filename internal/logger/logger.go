@@ -15,19 +15,16 @@ import (
 
 var globalLogger *zap.SugaredLogger
 
-// Init initializes the global logger
 func Init() error {
 	level := getEnv("LOG_LEVEL", "INFO")
 	format := getEnv("LOG_FORMAT", "json")
 	detailed := getEnv("LOG_DETAILED", "false") == "true"
 
-	// Create encoder config
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "time"
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 
-	// Create encoder
 	var encoder zapcore.Encoder
 	if format == "json" {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
@@ -35,14 +32,12 @@ func Init() error {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
-	// Create core
 	core := zapcore.NewCore(
 		encoder,
 		zapcore.AddSync(os.Stdout),
 		parseLogLevel(level),
 	)
 
-	// Create logger with caller skip
 	opts := []zap.Option{zap.AddCallerSkip(1)}
 	if detailed {
 		opts = append(opts, zap.AddCaller())
@@ -54,27 +49,22 @@ func Init() error {
 	return nil
 }
 
-// Debug logs a debug message
 func Debug(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	globalLogger.With(traceFields(ctx)...).Debugw(msg, keysAndValues...)
 }
 
-// Info logs an info message
 func Info(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	globalLogger.With(traceFields(ctx)...).Infow(msg, keysAndValues...)
 }
 
-// Warn logs a warning message
 func Warn(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	globalLogger.With(traceFields(ctx)...).Warnw(msg, keysAndValues...)
 }
 
-// Error logs an error message
 func Error(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	globalLogger.With(traceFields(ctx)...).Errorw(msg, keysAndValues...)
 }
 
-// ErrorWithErr logs an error with error object and records it in span
 func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...interface{}) {
 	if trace.Enabled() {
 		if span := ottrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
@@ -86,30 +76,23 @@ func ErrorWithErr(ctx context.Context, msg string, err error, keysAndValues ...i
 	globalLogger.With(traceFields(ctx)...).Errorw(msg, args...)
 }
 
-// Middleware/Observability logger functions with additional caller skip
-// These functions skip extra frames to report the actual caller instead of the middleware wrapper
 
-// DebugSkip logs a debug message with additional caller skip (for middleware use)
 func DebugSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
 	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Debugw(msg, keysAndValues...)
 }
 
-// InfoSkip logs an info message with additional caller skip (for middleware use)
 func InfoSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
 	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Infow(msg, keysAndValues...)
 }
 
-// WarnSkip logs a warning message with additional caller skip (for middleware use)
 func WarnSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
 	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Warnw(msg, keysAndValues...)
 }
 
-// ErrorSkip logs an error message with additional caller skip (for middleware use)
 func ErrorSkip(ctx context.Context, skip int, msg string, keysAndValues ...interface{}) {
 	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Errorw(msg, keysAndValues...)
 }
 
-// ErrorWithErrSkip logs an error with error object with additional caller skip (for middleware use)
 func ErrorWithErrSkip(ctx context.Context, skip int, msg string, err error, keysAndValues ...interface{}) {
 	if trace.Enabled() {
 		if span := ottrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
@@ -121,7 +104,6 @@ func ErrorWithErrSkip(ctx context.Context, skip int, msg string, err error, keys
 	globalLogger.WithOptions(zap.AddCallerSkip(skip)).With(traceFields(ctx)...).Errorw(msg, args...)
 }
 
-// Helper functions
 
 func traceFields(ctx context.Context) []interface{} {
 	if traceID, spanID, ok := trace.GetTraceFields(ctx); ok {

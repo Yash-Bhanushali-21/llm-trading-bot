@@ -11,7 +11,6 @@ import (
 	"github.com/zerodha/gokiteconnect/v4/models"
 )
 
-// setupEventHandlers configures all WebSocket event callbacks
 func (tm *tickerManager) setupEventHandlers() {
 	tm.ticker.OnConnect(tm.onConnect)
 	tm.ticker.OnError(tm.onError)
@@ -22,10 +21,8 @@ func (tm *tickerManager) setupEventHandlers() {
 	tm.ticker.OnOrderUpdate(tm.onOrderUpdate)
 }
 
-// Event handlers
 
 func (tm *tickerManager) onConnect() {
-	// Connection established
 }
 
 func (tm *tickerManager) onError(err error) {
@@ -40,7 +37,6 @@ func (tm *tickerManager) onClose(code int, reason string) {
 }
 
 func (tm *tickerManager) onReconnect(attempt int, delay time.Duration) {
-	// Reconnecting to WebSocket
 }
 
 func (tm *tickerManager) onNoReconnect(attempt int) {
@@ -50,13 +46,11 @@ func (tm *tickerManager) onNoReconnect(attempt int) {
 }
 
 func (tm *tickerManager) onTick(tick models.Tick) {
-	// Get symbol from token
 	symbol, exists := tm.tokenToSymbol[tick.InstrumentToken]
 	if !exists {
 		return
 	}
 
-	// Convert tick to candle and add to cache
 	candle := types.Candle{
 		Ts:    tick.Timestamp.Time.Unix(),
 		Open:  tick.OHLC.Open,
@@ -70,5 +64,4 @@ func (tm *tickerManager) onTick(tick models.Tick) {
 }
 
 func (tm *tickerManager) onOrderUpdate(order kiteconnect.Order) {
-	// Order update received via WebSocket
 }

@@ -15,29 +15,23 @@ import (
 	"llm-trading-bot/internal/types"
 )
 
-// OpenAIDecider implements the Decider interface using OpenAI's API
 type OpenAIDecider struct {
 	cfg *store.Config
 }
 
-// NewOpenAIDecider creates a new OpenAI-based decider
 func NewOpenAIDecider(cfg *store.Config) *OpenAIDecider {
 	return &OpenAIDecider{cfg: cfg}
 }
 
-// Decide makes a trading decision using OpenAI's API
 func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.Candle, inds types.Indicators, ctxmap map[string]any) (types.Decision, error) {
-	// Create span for LLM API call
 	ctx, span := trace.StartSpan(ctx, "openai-api-call")
 	defer span.End()
 
-	// Validate API key
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return types.Decision{}, errors.New("OPENAI_API_KEY missing")
 	}
 
-	// Prepare request
 	user := map[string]any{"symbol": symbol, "latest": latest, "indicators": inds, "context": ctxmap}
 	ub, _ := json.Marshal(user)
 	prompt := fmt.Sprintf("You will receive state as JSON. Respond ONLY with compact JSON matching the schema.\nSchema:%s\nState:%s", d.cfg.LLM.Schema, string(ub))
@@ -50,7 +44,6 @@ func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.
 	}
 	bb, _ := json.Marshal(body)
 
-	// Make API request
 	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(bb))
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -65,7 +58,6 @@ func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.
 		return types.Decision{}, fmt.Errorf("openai http %d", resp.StatusCode)
 	}
 
-	// Parse response
 	var r struct {
 		Choices []struct {
 			Message struct {
@@ -83,14 +75,11 @@ func (d *OpenAIDecider) Decide(ctx context.Context, symbol string, latest types.
 
 	out := strings.TrimSpace(r.Choices[0].Message.Content)
 
-	// Parse decision JSON
 	var dres types.Decision
 	if err := json.Unmarshal([]byte(out), &dres); err != nil {
-		// Fallback to HOLD on parse error
 		return types.Decision{Action: "HOLD", Reason: "invalid_json", Confidence: 0.0}, nil
 	}
 
-	// Normalize and validate decision
 	dres.Action = strings.ToUpper(strings.TrimSpace(dres.Action))
 	valid := map[string]bool{"BUY": true, "SELL": true, "HOLD": true}
 	if !valid[dres.Action] {

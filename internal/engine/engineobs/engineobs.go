@@ -22,22 +22,18 @@ func Wrap(eng interfaces.Engine) interfaces.Engine {
 	}
 }
 
-// Step executes one trading cycle with observability
 func (oe *observableEngine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
 	ctx, span := trace.StartSpan(ctx, "engine.Step")
 	defer span.End()
 
 	start := time.Now()
 
-	// Use InfoSkip(1) to report the actual caller, not this middleware wrapper
 	logger.InfoSkip(ctx, 1, "Starting trading cycle",
 		"symbol", symbol,
 	)
 
-	// Call underlying engine
 	result, err := oe.engine.Step(ctx, symbol)
 	if err != nil {
-		// Use ErrorWithErrSkip(1) to report the actual caller
 		logger.ErrorWithErrSkip(ctx, 1, "Trading cycle failed", err,
 			"symbol", symbol,
 			"duration_ms", time.Since(start).Milliseconds(),
@@ -45,7 +41,6 @@ func (oe *observableEngine) Step(ctx context.Context, symbol string) (*types.Ste
 		return nil, err
 	}
 
-	// Log successful cycle with result details
 	logger.InfoSkip(ctx, 1, "Trading cycle completed",
 		"symbol", symbol,
 		"action", result.Decision.Action,

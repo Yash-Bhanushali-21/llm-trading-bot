@@ -47,7 +47,6 @@ type Config struct {
 	} `yaml:"llm"`
 }
 
-// Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Mode != "DRY_RUN" && c.Mode != "LIVE" {
 		return fmt.Errorf("invalid mode '%s': must be 'DRY_RUN' or 'LIVE'", c.Mode)
@@ -77,7 +76,6 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// Set defaults
 	if c.PollSeconds == 0 {
 		c.PollSeconds = 15
 	}
@@ -85,7 +83,6 @@ func LoadConfig(path string) (*Config, error) {
 		c.DataSource = "STATIC"
 	}
 
-	// Validate configuration
 	if err := c.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}

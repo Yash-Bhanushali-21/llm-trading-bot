@@ -100,7 +100,6 @@ func CompressOlder(retentionDays int) error {
 		cutoff := time.Now().AddDate(0, 0, -retentionDays)
 		if info.ModTime().Before(cutoff) {
 			gz := p + ".gz"
-			// if already gz exists, remove original .txt
 			if _, e2 := os.Stat(gz); e2 == nil {
 				_ = os.Remove(p)
 				return nil
@@ -116,15 +115,12 @@ func CompressOlder(retentionDays int) error {
 			if e4 != nil {
 				return nil
 			}
-			// ensure writer is closed and file closed
 			gw := gzip.NewWriter(out)
-			// copy and handle error
 			if _, e5 := io.Copy(gw, in); e5 == nil {
 				_ = gw.Close()
 				_ = out.Close()
 				_ = os.Remove(p)
 			} else {
-				// close writer and file even on error
 				_ = gw.Close()
 				_ = out.Close()
 			}
