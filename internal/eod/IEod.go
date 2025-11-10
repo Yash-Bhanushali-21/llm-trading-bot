@@ -37,6 +37,11 @@ type IEodSummarizer interface {
 // Default implementation is package-level for backwards compatibility
 var defaultSummarizer IEodSummarizer = &eodSummarizer{}
 
+// SetDefaultSummarizer allows setting a custom default summarizer (e.g., wrapped with observability)
+func SetDefaultSummarizer(summarizer IEodSummarizer) {
+	defaultSummarizer = summarizer
+}
+
 // SummarizeDay uses the default summarizer to generate EOD summary.
 func SummarizeDay(t time.Time) (string, error) {
 	return defaultSummarizer.SummarizeDay(t)

@@ -8,6 +8,9 @@ import (
 	"llm-trading-bot/internal/broker/brokerobs"
 	"llm-trading-bot/internal/broker/zerodha"
 	"llm-trading-bot/internal/engine"
+	"llm-trading-bot/internal/engine/engineobs"
+	"llm-trading-bot/internal/eod"
+	"llm-trading-bot/internal/eod/eodobs"
 	"llm-trading-bot/internal/llm/claude"
 	"llm-trading-bot/internal/llm/llmobs"
 	"llm-trading-bot/internal/llm/noop"
@@ -21,7 +24,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// initializeSystem initializes logger and tracer
+// initializeSystem initializes logger, tracer, and EOD summarizer
 func initializeSystem() error {
 	// Load environment variables
 	_ = godotenv.Load()
@@ -35,6 +38,9 @@ func initializeSystem() error {
 	if err := trace.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize tracer: %v\n", err)
 	}
+
+	// Initialize EOD summarizer with observability
+	initializeEOD()
 
 	return nil
 }
@@ -104,7 +110,23 @@ func initializeDecider(ctx context.Context, cfg *store.Config) types.Decider {
 	return llmobs.Wrap(decider)
 }
 
-// initializeEngine initializes and returns the trading engine
+// initializeEngine initializes and returns the trading engine with observability
 func initializeEngine(cfg *store.Config, brk zerodha.Broker, decider types.Decider) engine.IEngine {
-	return engine.New(cfg, brk, decider)
+	// Create base engine
+	eng := engine.New(cfg, brk, decider)
+
+	// Wrap with observability middleware
+	return engineobs.Wrap(eng)
+}
+
+// initializeEOD wraps the default EOD summarizer with observability
+func initializeEOD() {
+	// Create base summarizer
+	baseSummarizer := eod.NewSummarizer()
+
+	// Wrap with observability middleware
+	observableSummarizer := eodobs.Wrap(baseSummarizer)
+
+	// Set as default summarizer
+	eod.SetDefaultSummarizer(observableSummarizer)
 }
