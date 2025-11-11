@@ -1,2 +1,5 @@
 .env
 bot
+forensic
+logs/
+cache/
