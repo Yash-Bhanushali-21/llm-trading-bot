@@ -180,14 +180,23 @@ Current miss:       0 points
 
 ## Data Sources
 
-### Yahoo Finance (Default - LIVE)
+### NSE-Optimized Data Fetching (Default - LIVE)
 
-The module fetches **real-time earnings data** from Yahoo Finance API:
-- ✅ **No API key required** - Free to use
-- ✅ **NSE stock support** - Automatically adds .NS suffix for Indian stocks
-- ✅ **Latest quarterly data** - EPS, revenue, margins, growth rates
-- ✅ **Earnings history** - Consecutive beats tracking
-- ✅ **Growth calculations** - YoY and QoQ comparisons
+The module is **specifically optimized for NSE (National Stock Exchange of India) stocks** with live, authentic data:
+
+- ✅ **NSE-Specific Fetcher** - Optimized for Indian stocks
+- ✅ **Yahoo Finance Primary** - No API key required, adds .NS suffix automatically
+- ✅ **Multi-Source Fallback** - NSE API and Screener.in fallbacks
+- ✅ **Symbol Validation** - Validates NSE stock codes
+- ✅ **Nifty 50 Default** - Uses top 50 NSE stocks if none configured
+- ✅ **Latest Quarterly Data** - EPS, revenue, margins, growth rates
+- ✅ **Earnings History** - Consecutive beats tracking
+- ✅ **Growth Calculations** - YoY and QoQ comparisons
+
+**Supported NSE Stocks:**
+- All Nifty 50 stocks (RELIANCE, TCS, HDFCBANK, INFY, etc.)
+- Popular midcap stocks (DIXON, PERSISTENT, COFORGE, etc.)
+- Any NSE-listed stock with earnings data
 
 **Features:**
 - Fetches actual EPS vs estimates

@@ -63,9 +63,11 @@ func main() {
 		fmt.Println("📊 Using MOCK earnings data for testing")
 		fetcher = pead.NewMockEarningsDataFetcher()
 	} else {
-		fmt.Println("📊 Fetching LIVE earnings data from Yahoo Finance")
+		fmt.Println("📊 Fetching LIVE earnings data for NSE stocks")
 		fmt.Println("⏳ This may take a few moments...")
-		fetcher = pead.NewYahooFinanceEarningsDataFetcher()
+		fmt.Println()
+		// Use NSE-optimized fetcher with Yahoo Finance + fallbacks
+		fetcher = pead.NewNSEDataFetcher()
 	}
 
 	// Create analyzer
@@ -77,6 +79,23 @@ func main() {
 		// Fallback to static universe
 		symbols = cfg.Universe.Static
 	}
+
+	// If still no symbols, use NSE Top 50 as default
+	if len(symbols) == 0 {
+		fmt.Println("ℹ️  No symbols configured, using NSE Nifty 50 stocks")
+		symbols = pead.GetNSETop50()
+	}
+
+	// Validate NSE symbols
+	validSymbols := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		if pead.ValidateNSESymbol(symbol) {
+			validSymbols = append(validSymbols, symbol)
+		} else {
+			fmt.Printf("⚠️  Warning: '%s' may not be a valid NSE symbol\n", symbol)
+		}
+	}
+	symbols = validSymbols
 
 	if len(symbols) == 0 {
 		fmt.Println("⚠️  No symbols configured for analysis")
