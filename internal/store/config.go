@@ -45,6 +45,21 @@ type Config struct {
 		System      string  `yaml:"system"`
 		Schema      string  `yaml:"schema"`
 	} `yaml:"llm"`
+	Forensic struct {
+		Enabled                 bool    `yaml:"enabled"`
+		LookbackDays            int     `yaml:"lookback_days"`
+		MinRiskScore            float64 `yaml:"min_risk_score"`
+		CheckManagement         bool    `yaml:"check_management"`
+		CheckAuditor            bool    `yaml:"check_auditor"`
+		CheckRelatedParty       bool    `yaml:"check_related_party"`
+		CheckPromoterPledge     bool    `yaml:"check_promoter_pledge"`
+		CheckRegulatory         bool    `yaml:"check_regulatory"`
+		CheckInsiderTrading     bool    `yaml:"check_insider_trading"`
+		CheckRestatements       bool    `yaml:"check_restatements"`
+		CheckGovernance         bool    `yaml:"check_governance"`
+		PromoterPledgeThreshold float64 `yaml:"promoter_pledge_threshold"`
+		OutputDir               string  `yaml:"output_dir"`
+	} `yaml:"forensic"`
 }
 
 func (c *Config) Validate() error {

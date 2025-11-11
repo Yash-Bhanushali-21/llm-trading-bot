@@ -130,6 +130,27 @@ llm:
     }
 
 # ───────────────────────────────
+# 🔍  FORENSIC CHECKER
+# ───────────────────────────────
+forensic:
+  enabled: true                      # enable/disable forensic analysis
+  lookback_days: 365                 # how far back to analyze (days)
+  min_risk_score: 40.0               # minimum score to trigger alert (0-100)
+
+  # Enable/disable specific checks
+  check_management: true             # detect management changes & resignations
+  check_auditor: true                # detect auditor changes or qualifications
+  check_related_party: true          # analyze related party transactions
+  check_promoter_pledge: true        # track pledge of promoter shares
+  check_regulatory: true             # monitor regulatory actions & penalties
+  check_insider_trading: true        # analyze insider trading patterns
+  check_restatements: true           # detect financial restatements
+  check_governance: true             # monitor governance score degradation
+
+  promoter_pledge_threshold: 50.0    # alert if pledge exceeds this % (0-100)
+  output_dir: logs/forensic          # where to save reports
+
+# ───────────────────────────────
 # 📦  LOGGING / FILES
 # ───────────────────────────────
 logs:
