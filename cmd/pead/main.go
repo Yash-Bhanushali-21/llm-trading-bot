@@ -59,14 +59,9 @@ func main() {
 		fmt.Println("📊 Using MOCK earnings data for testing")
 		fetcher = pead.NewMockEarningsDataFetcher()
 	} else {
-		apiKey := os.Getenv(peadConfig.APIKeyEnv)
-		if apiKey == "" {
-			fmt.Fprintf(os.Stderr, "API key not found in environment: %s\n", peadConfig.APIKeyEnv)
-			fmt.Println("Falling back to MOCK data source")
-			fetcher = pead.NewMockEarningsDataFetcher()
-		} else {
-			fetcher = pead.NewAPIEarningsDataFetcher(apiKey, "")
-		}
+		fmt.Println("📊 Fetching LIVE earnings data from Yahoo Finance")
+		fmt.Println("⏳ This may take a few moments...")
+		fetcher = pead.NewYahooFinanceEarningsDataFetcher()
 	}
 
 	// Create analyzer

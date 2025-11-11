@@ -159,8 +159,8 @@ pead:
     revenue_acceleration: 0.05    # weight for QoQ revenue acceleration score
 
   # Data source configuration
-  data_source: MOCK               # MOCK | API (for testing, use MOCK)
-  api_key_env: EARNINGS_API_KEY   # environment variable for API key
+  data_source: LIVE               # MOCK | LIVE (LIVE uses Yahoo Finance)
+  api_key_env: EARNINGS_API_KEY   # environment variable for API key (not required for Yahoo Finance)
 
 # ───────────────────────────────
 # 📦  LOGGING / FILES

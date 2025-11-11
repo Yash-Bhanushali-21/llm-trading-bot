@@ -180,24 +180,40 @@ Current miss:       0 points
 
 ## Data Sources
 
-### Mock Data (Default)
+### Yahoo Finance (Default - LIVE)
 
-For testing and development, the module generates realistic mock earnings data with:
+The module fetches **real-time earnings data** from Yahoo Finance API:
+- ✅ **No API key required** - Free to use
+- ✅ **NSE stock support** - Automatically adds .NS suffix for Indian stocks
+- ✅ **Latest quarterly data** - EPS, revenue, margins, growth rates
+- ✅ **Earnings history** - Consecutive beats tracking
+- ✅ **Growth calculations** - YoY and QoQ comparisons
+
+**Features:**
+- Fetches actual EPS vs estimates
+- Calculates YoY and QoQ growth rates
+- Extracts profit margins (gross, operating, net)
+- Tracks consecutive earnings beats
+- Handles NSE symbol format automatically (RELIANCE → RELIANCE.NS)
+
+**Configuration:**
+```yaml
+pead:
+  data_source: LIVE  # Uses Yahoo Finance (no API key needed)
+```
+
+### Mock Data (For Testing)
+
+For testing without network calls, the module can generate realistic mock data:
 - Randomized earnings surprises (60% positive, 40% negative)
 - Variable growth rates (-20% to 80% for EPS, -10% to 50% for revenue)
 - Realistic profit margins and consecutive beat counts
 
-### API Integration (TODO)
-
-The module is designed to integrate with real earnings data APIs:
-- **Alpha Vantage**: Earnings Calendar API
-- **Financial Modeling Prep**: Earnings API
-- **Yahoo Finance**: Unofficial yfinance library
-
-To add API support:
-1. Implement `FetchLatestEarnings()` in `APIEarningsDataFetcher`
-2. Set `EARNINGS_API_KEY` in `.env`
-3. Change `data_source: API` in `config.yaml`
+**Configuration:**
+```yaml
+pead:
+  data_source: MOCK  # Uses mock data generator
+```
 
 ## Integration with Trading Bot
 
@@ -273,12 +289,47 @@ min_eps_growth: 0
 min_earnings_surprise: 0
 ```
 
+## Troubleshooting
+
+### Yahoo Finance 403 Error
+
+If you encounter `API returned status 403` errors:
+
+**Causes:**
+- Yahoo Finance rate limiting
+- IP blocking in certain environments
+- Geographic restrictions
+
+**Solutions:**
+1. **Use a different network**: Try running from your local machine instead of a cloud environment
+2. **Add delays**: The fetcher includes 1-second delays between requests
+3. **Use a proxy**: Configure HTTP proxy in your environment
+4. **Use VPN**: Connect through a VPN if geographically blocked
+5. **Fallback to mock data**: Set `data_source: MOCK` in config.yaml for testing
+
+**Testing locally:**
+```bash
+# Test from your local machine
+git clone <repo>
+cd llm-trading-bot
+go run cmd/pead/main.go
+```
+
+### No Data Returned
+
+If no companies qualify:
+- **Lower thresholds**: Reduce `PEAD_MIN_SCORE` in `.env` (try 30-35)
+- **Adjust filters**: Lower `min_eps_growth` or `min_revenue_growth` in `config.yaml`
+- **Expand time window**: Increase `max_days_since_earnings` to 90 days
+- **Check symbols**: Ensure symbols are valid NSE stock codes
+
 ## Limitations
 
-1. **Mock Data**: Currently uses mock earnings data - integrate real API for production
+1. **Yahoo Finance Dependency**: Free API may have rate limits or accessibility issues
 2. **Historical Bias**: Past earnings beats don't guarantee future performance
 3. **Market Conditions**: PEAD may be weaker in bear markets or high volatility periods
 4. **Transaction Costs**: Frequent trading based on PEAD can incur significant costs
+5. **Data Quality**: Relies on Yahoo Finance data accuracy and availability
 
 ## Future Enhancements
 
