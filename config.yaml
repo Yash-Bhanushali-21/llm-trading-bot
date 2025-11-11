@@ -134,6 +134,7 @@ llm:
 # ───────────────────────────────
 forensic:
   enabled: true                      # enable/disable forensic analysis
+  data_source: MOCK                  # MOCK (test data) or LIVE (real APIs)
   lookback_days: 365                 # how far back to analyze (days)
   min_risk_score: 40.0               # minimum score to trigger alert (0-100)
 
@@ -149,6 +150,14 @@ forensic:
 
   promoter_pledge_threshold: 50.0    # alert if pledge exceeds this % (0-100)
   output_dir: logs/forensic          # where to save reports
+  cache_dir: cache/forensic          # where to cache API responses
+  cache_ttl_hours: 24                # cache time-to-live in hours
+
+  # Enable/disable data sources (only for LIVE mode)
+  enable_nse: true                   # NSE India API
+  enable_bse: true                   # BSE India API
+  enable_sebi: true                  # SEBI insider trading & regulatory data
+  enable_screener: true              # Screener.in for financials & shareholding
 
 # ───────────────────────────────
 # 📦  LOGGING / FILES

@@ -64,9 +64,12 @@ func main() {
 		PromoterPledgeThreshold: cfg.Forensic.PromoterPledgeThreshold,
 	}
 
-	// Initialize data source (using mock for now)
-	// In production, replace with actual data source implementation
-	dataSource := forensic.NewMockDataSource()
+	// Initialize data source based on configuration
+	dataSource, err := forensic.CreateDataSource(cfg)
+	if err != nil {
+		fmt.Printf("Error creating data source: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Create forensic checker
 	checker := forensic.NewChecker(forensicCfg, dataSource)

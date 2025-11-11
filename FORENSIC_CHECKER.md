@@ -58,6 +58,41 @@ The tool monitors and analyzes:
 - Compares ratings across providers
 - Identifies declining governance standards
 
+### 9. **Document Analysis** 📄 (NEW!)
+- **Automated document scraping**: Downloads and analyzes official company documents
+- **PDF & HTML parsing**: Extracts text from annual reports, board notices, financial results
+- **LLM-powered analysis**: Uses AI to identify red flags in document text
+- **Keyword detection**: Scans for forensic indicators (going concern, qualified opinion, etc.)
+- **Structured extraction**: Pulls out key data points from documents
+- **Document types supported**:
+  - Annual Reports & Audit Reports
+  - Board Meeting Notices & Resolutions
+  - Financial Results & Restatements
+  - Corporate Announcements
+  - Regulatory Filings
+
+## Data Sources
+
+The tool supports two data source modes:
+
+### **MOCK Mode** (Default)
+- Uses synthetic test data
+- Perfect for testing and development
+- No API dependencies
+- Consistent, reproducible results
+
+### **LIVE Mode** (Production)
+- Fetches real-time data from multiple sources:
+  - **NSE India API**: Corporate announcements, shareholding patterns
+  - **BSE India API**: Corporate actions and announcements
+  - **SEBI**: Insider trading data, regulatory actions
+  - **Screener.in**: Financial data, shareholding patterns
+- Intelligent caching (24-hour TTL)
+- Rate limiting to respect API limits
+- Fallback mechanisms for reliability
+
+See [LIVE_DATA_INTEGRATION.md](LIVE_DATA_INTEGRATION.md) for detailed documentation.
+
 ## Installation
 
 ### Prerequisites

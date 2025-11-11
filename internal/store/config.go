@@ -47,6 +47,7 @@ type Config struct {
 	} `yaml:"llm"`
 	Forensic struct {
 		Enabled                 bool    `yaml:"enabled"`
+		DataSource              string  `yaml:"data_source"`              // MOCK or LIVE
 		LookbackDays            int     `yaml:"lookback_days"`
 		MinRiskScore            float64 `yaml:"min_risk_score"`
 		CheckManagement         bool    `yaml:"check_management"`
@@ -59,6 +60,12 @@ type Config struct {
 		CheckGovernance         bool    `yaml:"check_governance"`
 		PromoterPledgeThreshold float64 `yaml:"promoter_pledge_threshold"`
 		OutputDir               string  `yaml:"output_dir"`
+		CacheDir                string  `yaml:"cache_dir"`
+		CacheTTLHours           int     `yaml:"cache_ttl_hours"`
+		EnableNSE               bool    `yaml:"enable_nse"`
+		EnableBSE               bool    `yaml:"enable_bse"`
+		EnableSEBI              bool    `yaml:"enable_sebi"`
+		EnableScreener          bool    `yaml:"enable_screener"`
 	} `yaml:"forensic"`
 }
 
