@@ -45,6 +45,14 @@ type Config struct {
 		System      string  `yaml:"system"`
 		Schema      string  `yaml:"schema"`
 	} `yaml:"llm"`
+	NewsSentiment struct {
+		Enabled               bool    `yaml:"enabled"`
+		MaxArticles           int     `yaml:"max_articles"`
+		CacheDurationHours    int     `yaml:"cache_duration_hours"`
+		ScraperTimeoutSeconds int     `yaml:"scraper_timeout_seconds"`
+		UseForDecisions       bool    `yaml:"use_for_decisions"`
+		MinConfidence         float64 `yaml:"min_confidence"`
+	} `yaml:"news_sentiment"`
 }
 
 func (c *Config) Validate() error {
@@ -81,6 +89,20 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if c.DataSource == "" {
 		c.DataSource = "STATIC"
+	}
+
+	// Set defaults for news sentiment if not specified
+	if c.NewsSentiment.MaxArticles == 0 {
+		c.NewsSentiment.MaxArticles = 15
+	}
+	if c.NewsSentiment.CacheDurationHours == 0 {
+		c.NewsSentiment.CacheDurationHours = 1
+	}
+	if c.NewsSentiment.ScraperTimeoutSeconds == 0 {
+		c.NewsSentiment.ScraperTimeoutSeconds = 30
+	}
+	if c.NewsSentiment.MinConfidence == 0 {
+		c.NewsSentiment.MinConfidence = 0.4
 	}
 
 	if err := c.Validate(); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"llm-trading-bot/internal/broker/brokerobs"
 	"llm-trading-bot/internal/broker/zerodha"
@@ -17,6 +18,7 @@ import (
 	"llm-trading-bot/internal/llm/noop"
 	"llm-trading-bot/internal/llm/openai"
 	"llm-trading-bot/internal/logger"
+	"llm-trading-bot/internal/news"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/trace"
 	"llm-trading-bot/internal/tradelog"
@@ -110,10 +112,32 @@ func initializeDecider(ctx context.Context, cfg *store.Config) interfaces.Decide
 	return llmobs.Wrap(decider)
 }
 
+// initializeNewsService initializes and returns the news sentiment service
+func initializeNewsService(ctx context.Context, cfg *store.Config) *news.Service {
+	if !cfg.NewsSentiment.Enabled {
+		logger.Info(ctx, "News sentiment analysis is disabled")
+		return nil
+	}
+
+	serviceCfg := &news.ServiceConfig{
+		MaxArticles:    cfg.NewsSentiment.MaxArticles,
+		CacheDuration:  time.Duration(cfg.NewsSentiment.CacheDurationHours) * time.Hour,
+		ScraperTimeout: time.Duration(cfg.NewsSentiment.ScraperTimeoutSeconds) * time.Second,
+		Enabled:        cfg.NewsSentiment.Enabled,
+	}
+
+	newsSvc := news.NewService(cfg, serviceCfg)
+	logger.Info(ctx, "News sentiment service initialized",
+		"max_articles", serviceCfg.MaxArticles,
+		"cache_duration_hours", cfg.NewsSentiment.CacheDurationHours)
+
+	return newsSvc
+}
+
 // initializeEngine initializes and returns the trading engine with observability
-func initializeEngine(cfg *store.Config, brk interfaces.Broker, decider interfaces.Decider) interfaces.Engine {
+func initializeEngine(cfg *store.Config, brk interfaces.Broker, decider interfaces.Decider, newsSvc *news.Service) interfaces.Engine {
 	// Create base engine
-	eng := engine.New(cfg, brk, decider)
+	eng := engine.New(cfg, brk, decider, newsSvc)
 
 	// Wrap with observability middleware
 	return engineobs.Wrap(eng)
