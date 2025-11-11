@@ -7,6 +7,7 @@ import (
 
 	"llm-trading-bot/internal/interfaces"
 	"llm-trading-bot/internal/logger"
+	"llm-trading-bot/internal/news"
 	"llm-trading-bot/internal/store"
 	"llm-trading-bot/internal/types"
 )
@@ -15,6 +16,7 @@ type Engine struct {
 	cfg      *store.Config
 	broker   interfaces.Broker
 	llm      interfaces.Decider
+	newsSvc  *news.Service
 	dayStart time.Time
 
 	positions *positionManager
@@ -23,11 +25,12 @@ type Engine struct {
 	executor  *orderExecutor
 }
 
-func newEngine(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) *Engine {
+func newEngine(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider, newsSvc *news.Service) *Engine {
 	return &Engine{
 		cfg:      cfg,
 		broker:   brk,
 		llm:      d,
+		newsSvc:  newsSvc,
 		dayStart: midnightIST(),
 
 		positions: newPositionManager(),
@@ -43,8 +46,8 @@ func newEngine(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) *
 	}
 }
 
-func New(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider) interfaces.Engine {
-	return newEngine(cfg, brk, d)
+func New(cfg *store.Config, brk interfaces.Broker, d interfaces.Decider, newsSvc *news.Service) interfaces.Engine {
+	return newEngine(cfg, brk, d, newsSvc)
 }
 
 func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, error) {
@@ -77,10 +80,33 @@ func (e *Engine) Step(ctx context.Context, symbol string) (*types.StepResult, er
 		return result, nil
 	}
 
-	decision, err := e.llm.Decide(ctx, symbol, latest, indicators, map[string]any{
+	// Build context data for LLM decision
+	contextData := map[string]any{
 		"price": price,
 		"risk":  e.cfg.Risk,
-	})
+	}
+
+	// Add news sentiment if enabled and configured
+	if e.cfg.NewsSentiment.Enabled && e.cfg.NewsSentiment.UseForDecisions && e.newsSvc != nil {
+		sentiment, err := e.newsSvc.GetSentiment(ctx, symbol)
+		if err == nil && sentiment.Confidence >= e.cfg.NewsSentiment.MinConfidence {
+			contextData["news_sentiment"] = map[string]any{
+				"overall_sentiment": sentiment.OverallSentiment,
+				"score":             sentiment.OverallScore,
+				"confidence":        sentiment.Confidence,
+				"recommendation":    sentiment.Recommendation,
+				"summary":           sentiment.Summary,
+				"article_count":     sentiment.ArticleCount,
+			}
+			logger.Info(ctx, "Including news sentiment in decision", "symbol", symbol,
+				"sentiment", sentiment.OverallSentiment, "score", sentiment.OverallScore,
+				"confidence", sentiment.Confidence)
+		} else if err != nil {
+			logger.ErrorWithErr(ctx, "Failed to get sentiment, proceeding without it", err, "symbol", symbol)
+		}
+	}
+
+	decision, err := e.llm.Decide(ctx, symbol, latest, indicators, contextData)
 	if err != nil {
 		logger.ErrorWithErr(ctx, "LLM decision failed", err, "symbol", symbol)
 		return nil, err

@@ -55,7 +55,8 @@ func main() {
 	// Initialize components
 	brk := initializeBroker(ctx, cfg)
 	decider := initializeDecider(ctx, cfg)
-	eng := initializeEngine(cfg, brk, decider)
+	newsSvc := initializeNewsService(ctx, cfg)
+	eng := initializeEngine(cfg, brk, decider, newsSvc)
 
 	// Start broker (WebSocket connections if in LIVE mode)
 	if err := brk.Start(ctx, cfg.UniverseStatic); err != nil {

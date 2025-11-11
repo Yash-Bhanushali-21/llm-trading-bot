@@ -120,6 +120,12 @@ llm:
     Avoid natural language. Only BUY, SELL or HOLD based on signals.
     Respect stop-loss, avoid overtrading, and act conservatively on low confidence.
 
+    When news sentiment data is provided in context, factor it into your decision:
+    - POSITIVE sentiment (score > 0.3) with good business outlook → favor BUY
+    - NEGATIVE sentiment (score < -0.3) with poor outlook → favor SELL
+    - MIXED/NEUTRAL or low confidence sentiment → rely more on technical indicators
+    - Consider sentiment confidence level when weighting news vs. technical signals
+
   # schema for JSON output
   schema: |
     {
@@ -128,6 +134,19 @@ llm:
       "confidence": 0.0_to_1.0,
       "qty": "integer_optional"
     }
+
+# ───────────────────────────────
+# 📰  NEWS SENTIMENT ANALYSIS
+# ───────────────────────────────
+news_sentiment:
+  enabled: true               # enable/disable news sentiment analysis
+  max_articles: 15            # maximum articles to analyze per symbol
+  cache_duration_hours: 1     # cache sentiment for this many hours
+  scraper_timeout_seconds: 30 # timeout for web scraping operations
+
+  # When to use sentiment in decisions
+  use_for_decisions: true     # include sentiment in trading decisions
+  min_confidence: 0.4         # minimum confidence to use sentiment (0.0-1.0)
 
 # ───────────────────────────────
 # 📦  LOGGING / FILES
