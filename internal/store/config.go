@@ -80,6 +80,7 @@ type Config struct {
 		MinEarningsSurprise  float64 `yaml:"min_earnings_surprise"`
 		MinRevenueGrowth     float64 `yaml:"min_revenue_growth"`
 		MinEPSGrowth         float64 `yaml:"min_eps_growth"`
+		EnableNLP            bool    `yaml:"enable_nlp"`
 		Weights              struct {
 			EarningsSurprise    float64 `yaml:"earnings_surprise"`
 			RevenueSurprise     float64 `yaml:"revenue_surprise"`
@@ -88,6 +89,9 @@ type Config struct {
 			MarginExpansion     float64 `yaml:"margin_expansion"`
 			Consistency         float64 `yaml:"consistency"`
 			RevenueAcceleration float64 `yaml:"revenue_acceleration"`
+			Sentiment           float64 `yaml:"sentiment"`
+			ToneDivergence      float64 `yaml:"tone_divergence"`
+			LinguisticQuality   float64 `yaml:"linguistic_quality"`
 		} `yaml:"weights"`
 		DataSource string `yaml:"data_source"`
 		APIKeyEnv  string `yaml:"api_key_env"`

@@ -148,8 +148,14 @@ pead:
   min_revenue_growth: -10         # minimum YoY revenue growth %
   min_eps_growth: 0               # minimum YoY EPS growth %
 
-  # Scoring component weights (must sum to 1.0)
+  # NLP enhancement (based on Quantpedia research)
+  enable_nlp: false               # Enable NLP sentiment analysis (experimental)
+
+  # Scoring component weights
+  # NOTE: When enable_nlp=false, traditional weights should sum to 1.0
+  # NOTE: When enable_nlp=true, all weights (including NLP) should sum to 1.0
   weights:
+    # Traditional PEAD factors (sum = 1.0 when NLP disabled)
     earnings_surprise: 0.25       # weight for earnings surprise score
     revenue_surprise: 0.15        # weight for revenue surprise score
     earnings_growth: 0.20         # weight for YoY EPS growth score
@@ -157,6 +163,12 @@ pead:
     margin_expansion: 0.10        # weight for profit margin expansion score
     consistency: 0.10             # weight for consecutive beats score
     revenue_acceleration: 0.05    # weight for QoQ revenue acceleration score
+
+    # NLP-enhanced factors (only used when enable_nlp=true)
+    # When enabling NLP, reduce traditional weights proportionally to fit NLP weights
+    sentiment: 0.00               # weight for overall management sentiment
+    tone_divergence: 0.00         # weight for tone-results alignment
+    linguistic_quality: 0.00      # weight for certainty/clarity/forward-looking
 
   # Data source configuration
   data_source: LIVE               # MOCK | LIVE (LIVE uses Yahoo Finance)

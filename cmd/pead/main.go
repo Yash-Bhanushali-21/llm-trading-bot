@@ -28,6 +28,7 @@ func main() {
 		MinEarningsSurprise:  cfg.PEAD.MinEarningsSurprise,
 		MinRevenueGrowth:     cfg.PEAD.MinRevenueGrowth,
 		MinEPSGrowth:         cfg.PEAD.MinEPSGrowth,
+		EnableNLP:            cfg.PEAD.EnableNLP,
 		DataSource:           cfg.PEAD.DataSource,
 		APIKeyEnv:            cfg.PEAD.APIKeyEnv,
 		Weights: pead.ScoringWeights{
@@ -38,6 +39,9 @@ func main() {
 			MarginExpansion:     cfg.PEAD.Weights.MarginExpansion,
 			Consistency:         cfg.PEAD.Weights.Consistency,
 			RevenueAcceleration: cfg.PEAD.Weights.RevenueAcceleration,
+			Sentiment:           cfg.PEAD.Weights.Sentiment,
+			ToneDivergence:      cfg.PEAD.Weights.ToneDivergence,
+			LinguisticQuality:   cfg.PEAD.Weights.LinguisticQuality,
 		},
 	}
 

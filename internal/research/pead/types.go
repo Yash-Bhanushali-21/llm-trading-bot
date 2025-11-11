@@ -35,6 +35,9 @@ type EarningsData struct {
 
 	// Beat streak (historical context)
 	ConsecutiveBeats int `json:"consecutive_beats"` // Number of consecutive quarters beating estimates
+
+	// NLP Sentiment Data (optional - may be nil if not available)
+	Sentiment *SentimentData `json:"sentiment,omitempty"`
 }
 
 // EarningSurprise calculates the earnings surprise percentage
@@ -75,7 +78,7 @@ type PEADScore struct {
 	AnnouncementDate time.Time `json:"announcement_date"`
 	DaysSinceEarnings int      `json:"days_since_earnings"`
 
-	// Individual component scores (0-100)
+	// Traditional component scores (0-100)
 	EarningsSurpriseScore    float64 `json:"earnings_surprise_score"`
 	RevenueSurpriseScore     float64 `json:"revenue_surprise_score"`
 	EarningsGrowthScore      float64 `json:"earnings_growth_score"`
@@ -83,6 +86,11 @@ type PEADScore struct {
 	MarginExpansionScore     float64 `json:"margin_expansion_score"`
 	ConsistencyScore         float64 `json:"consistency_score"`
 	RevenueAccelerationScore float64 `json:"revenue_acceleration_score"`
+
+	// NLP-enhanced component scores (0-100)
+	SentimentScore           float64 `json:"sentiment_score"`            // Overall sentiment
+	ToneDivergenceScore      float64 `json:"tone_divergence_score"`      // Tone vs results alignment
+	LinguisticQualityScore   float64 `json:"linguistic_quality_score"`   // Certainty, clarity
 
 	// Overall composite score (0-100)
 	CompositeScore float64 `json:"composite_score"`
@@ -120,10 +128,14 @@ type PEADConfig struct {
 	// Data source configuration
 	DataSource string `yaml:"data_source"`
 	APIKeyEnv  string `yaml:"api_key_env"`
+
+	// NLP configuration
+	EnableNLP bool `yaml:"enable_nlp"` // Enable NLP sentiment analysis
 }
 
 // ScoringWeights defines the weights for different scoring components
 type ScoringWeights struct {
+	// Traditional PEAD weights
 	EarningsSurprise    float64 `yaml:"earnings_surprise"`
 	RevenueSurprise     float64 `yaml:"revenue_surprise"`
 	EarningsGrowth      float64 `yaml:"earnings_growth"`
@@ -131,6 +143,11 @@ type ScoringWeights struct {
 	MarginExpansion     float64 `yaml:"margin_expansion"`
 	Consistency         float64 `yaml:"consistency"`
 	RevenueAcceleration float64 `yaml:"revenue_acceleration"`
+
+	// NLP-enhanced weights
+	Sentiment           float64 `yaml:"sentiment"`             // Overall sentiment score
+	ToneDivergence      float64 `yaml:"tone_divergence"`       // Tone-results alignment
+	LinguisticQuality   float64 `yaml:"linguistic_quality"`    // Certainty, clarity
 }
 
 // PEADResult represents the final filtered results

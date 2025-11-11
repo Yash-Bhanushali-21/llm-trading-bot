@@ -147,7 +147,9 @@ func GetDefaultConfig() PEADConfig {
 		MinDaysSinceEarnings: 1,
 		MaxDaysSinceEarnings: 60, // PEAD typically occurs within 60 days
 		MinCompositeScore:    40,  // Changed to default 40 (user can override in .env)
+		EnableNLP:            false, // NLP disabled by default
 		Weights: ScoringWeights{
+			// Traditional PEAD weights (sum = 1.0)
 			EarningsSurprise:    0.25,
 			RevenueSurprise:     0.15,
 			EarningsGrowth:      0.20,
@@ -155,9 +157,14 @@ func GetDefaultConfig() PEADConfig {
 			MarginExpansion:     0.10,
 			Consistency:         0.10,
 			RevenueAcceleration: 0.05,
+			// NLP weights (0.0 by default)
+			Sentiment:           0.00,
+			ToneDivergence:      0.00,
+			LinguisticQuality:   0.00,
 		},
 		MinEarningsSurprise: 0,    // No minimum by default (can be negative)
 		MinRevenueGrowth:    -10,  // Allow up to -10% revenue decline
 		MinEPSGrowth:        0,    // Minimum 0% EPS growth (no decline)
+		DataSource:          "LIVE",
 	}
 }

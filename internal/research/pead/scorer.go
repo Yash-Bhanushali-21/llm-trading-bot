@@ -28,7 +28,7 @@ func (s *PEADScorer) CalculateScore(data *EarningsData) *PEADScore {
 		EarningsData:      *data,
 	}
 
-	// Calculate individual component scores (0-100)
+	// Calculate traditional component scores (0-100)
 	score.EarningsSurpriseScore = s.scoreEarningsSurprise(data)
 	score.RevenueSurpriseScore = s.scoreRevenueSurprise(data)
 	score.EarningsGrowthScore = s.scoreEarningsGrowth(data)
@@ -36,6 +36,13 @@ func (s *PEADScorer) CalculateScore(data *EarningsData) *PEADScore {
 	score.MarginExpansionScore = s.scoreMarginExpansion(data)
 	score.ConsistencyScore = s.scoreConsistency(data)
 	score.RevenueAccelerationScore = s.scoreRevenueAcceleration(data)
+
+	// Calculate NLP-enhanced scores if sentiment data available
+	if data.Sentiment != nil && s.config.EnableNLP {
+		score.SentimentScore = s.scoreSentiment(data.Sentiment)
+		score.ToneDivergenceScore = s.scoreToneDivergence(data)
+		score.LinguisticQualityScore = s.scoreLinguisticQuality(data.Sentiment)
+	}
 
 	// Calculate weighted composite score
 	score.CompositeScore = s.calculateCompositeScore(score)
@@ -196,6 +203,7 @@ func (s *PEADScorer) scoreRevenueAcceleration(data *EarningsData) float64 {
 func (s *PEADScorer) calculateCompositeScore(score *PEADScore) float64 {
 	weights := s.config.Weights
 
+	// Traditional PEAD components
 	composite := score.EarningsSurpriseScore*weights.EarningsSurprise +
 		score.RevenueSurpriseScore*weights.RevenueSurprise +
 		score.EarningsGrowthScore*weights.EarningsGrowth +
@@ -203,6 +211,13 @@ func (s *PEADScorer) calculateCompositeScore(score *PEADScore) float64 {
 		score.MarginExpansionScore*weights.MarginExpansion +
 		score.ConsistencyScore*weights.Consistency +
 		score.RevenueAccelerationScore*weights.RevenueAcceleration
+
+	// Add NLP components if enabled
+	if s.config.EnableNLP && score.EarningsData.Sentiment != nil {
+		composite += score.SentimentScore * weights.Sentiment
+		composite += score.ToneDivergenceScore * weights.ToneDivergence
+		composite += score.LinguisticQualityScore * weights.LinguisticQuality
+	}
 
 	return math.Min(100, math.Max(0, composite))
 }
@@ -242,6 +257,29 @@ func (s *PEADScorer) generateCommentary(score *PEADScore) string {
 		commentary += fmt.Sprintf("Consistent track record with %d consecutive beats. ", data.ConsecutiveBeats)
 	}
 
+	// Add NLP insights if available
+	if s.config.EnableNLP && data.Sentiment != nil {
+		sentiment := data.Sentiment
+
+		if sentiment.OverallSentiment > 0.3 {
+			commentary += "Management tone is positive and optimistic. "
+		} else if sentiment.OverallSentiment < -0.3 {
+			commentary += "Management tone shows caution or concern. "
+		}
+
+		if sentiment.CertaintyScore > 0.7 {
+			commentary += "High confidence in forward guidance. "
+		}
+
+		// Flag tone-result divergence
+		earningSurprise := data.EarningSurprise()
+		if earningSurprise > 0 && sentiment.OverallSentiment < 0 {
+			commentary += "Note: Positive results but cautious management tone. "
+		} else if earningSurprise < 0 && sentiment.OverallSentiment > 0 {
+			commentary += "⚠️ Warning: Negative results but overly positive tone - potential red flag. "
+		}
+	}
+
 	// Add concerns if any
 	if data.YoYRevenueGrowth < 0 {
 		commentary += "Revenue declining YoY is a concern. "
@@ -254,4 +292,98 @@ func (s *PEADScorer) generateCommentary(score *PEADScore) string {
 	commentary += fmt.Sprintf("Overall PEAD score: %.1f (%s).", score.CompositeScore, score.Rating)
 
 	return commentary
+}
+
+// scoreSentiment scores based on overall sentiment from NLP analysis
+func (s *PEADScorer) scoreSentiment(sentiment *SentimentData) float64 {
+	// Overall sentiment ranges from -1 to 1
+	// Convert to 0-100 scale
+	// Positive sentiment = higher score
+	baseScore := (sentiment.OverallSentiment + 1) * 50 // Maps -1..1 to 0..100
+
+	// Boost for strong net positive sentiment
+	if sentiment.NetSentimentRatio > 0 {
+		baseScore += sentiment.NetSentimentRatio * 100 * 0.2 // Up to 20 point boost
+	}
+
+	// Boost for optimism
+	baseScore += sentiment.OptimismScore * 10 // Up to 10 point boost
+
+	return math.Min(100, math.Max(0, baseScore))
+}
+
+// scoreToneDivergence scores based on alignment between tone and results
+func (s *PEADScorer) scoreToneDivergence(data *EarningsData) float64 {
+	if data.Sentiment == nil {
+		return 50 // Neutral if no sentiment data
+	}
+
+	// Calculate earnings quality (beat or miss)
+	earningSurprise := data.EarningSurprise()
+
+	// Expected alignment:
+	// - Positive results should have positive tone
+	// - Negative results should have negative tone
+	// - Divergence is suspicious (managing expectations or hiding problems)
+
+	sentiment := data.Sentiment.OverallSentiment
+
+	// Perfect alignment scores high
+	if (earningSurprise > 0 && sentiment > 0) || (earningSurprise < 0 && sentiment < 0) {
+		// Both positive or both negative = good alignment
+		alignment := 1.0 - math.Abs(earningSurprise/10.0-sentiment*10.0)/20.0
+		return math.Max(0, math.Min(100, 70+alignment*30)) // 70-100 range
+	}
+
+	// Divergence scenarios:
+	// 1. Positive results, negative tone = cautious management (slightly negative)
+	// 2. Negative results, positive tone = spin/misleading (very negative)
+
+	if earningSurprise > 0 && sentiment < 0 {
+		// Beat but negative tone - management cautious, could be good (conservative)
+		return 55 + earningSurprise // Slight boost from results
+	}
+
+	if earningSurprise < 0 && sentiment > 0 {
+		// Miss but positive tone - trying to spin bad news (red flag)
+		return math.Max(0, 40-math.Abs(earningSurprise)) // Penalty for divergence
+	}
+
+	return 50 // Neutral
+}
+
+// scoreLinguisticQuality scores based on certainty, clarity, and forward-looking language
+func (s *PEADScorer) scoreLinguisticQuality(sentiment *SentimentData) float64 {
+	// High quality = confident, clear, forward-looking
+	// Low quality = uncertain, complex, evasive
+
+	qualityScore := 0.0
+
+	// Certainty (confident language is positive)
+	qualityScore += sentiment.CertaintyScore * 35 // Max 35 points
+
+	// Readability (clearer is better)
+	// Flesch score: 60-70 = standard, >70 = easy, <60 = difficult
+	readabilityScore := 0.0
+	if sentiment.ReadabilityScore > 70 {
+		readabilityScore = 25 // Easy to read = transparent
+	} else if sentiment.ReadabilityScore > 60 {
+		readabilityScore = 20 // Standard
+	} else if sentiment.ReadabilityScore > 50 {
+		readabilityScore = 15 // Somewhat difficult
+	} else {
+		readabilityScore = 10 // Very complex (potentially hiding issues)
+	}
+	qualityScore += readabilityScore
+
+	// Forward-looking (companies with vision score higher)
+	qualityScore += sentiment.ForwardLookingScore * 25 // Max 25 points
+
+	// Penalty for excessive uncertainty
+	qualityScore -= sentiment.UncertaintyScore * 15 // Max 15 point penalty
+
+	// Bonus for optimism
+	qualityScore += sentiment.OptimismScore * 15 // Max 15 points
+
+	return math.Max(0, math.Min(100, qualityScore))
 }
