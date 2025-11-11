@@ -130,6 +130,39 @@ llm:
     }
 
 # ───────────────────────────────
+# 📈  PEAD RESEARCH MODULE
+# ───────────────────────────────
+pead:
+  enabled: true
+
+  # PEAD time window (days since earnings announcement)
+  min_days_since_earnings: 1
+  max_days_since_earnings: 60    # PEAD effect typically within 60 days
+
+  # Minimum composite score threshold (0-100)
+  # Only companies with this score or higher will qualify
+  min_composite_score: 40         # can be overridden by PEAD_MIN_SCORE in .env
+
+  # Minimum thresholds for individual metrics
+  min_earnings_surprise: 0        # minimum earnings surprise % (can be negative)
+  min_revenue_growth: -10         # minimum YoY revenue growth %
+  min_eps_growth: 0               # minimum YoY EPS growth %
+
+  # Scoring component weights (must sum to 1.0)
+  weights:
+    earnings_surprise: 0.25       # weight for earnings surprise score
+    revenue_surprise: 0.15        # weight for revenue surprise score
+    earnings_growth: 0.20         # weight for YoY EPS growth score
+    revenue_growth: 0.15          # weight for YoY revenue growth score
+    margin_expansion: 0.10        # weight for profit margin expansion score
+    consistency: 0.10             # weight for consecutive beats score
+    revenue_acceleration: 0.05    # weight for QoQ revenue acceleration score
+
+  # Data source configuration
+  data_source: MOCK               # MOCK | API (for testing, use MOCK)
+  api_key_env: EARNINGS_API_KEY   # environment variable for API key
+
+# ───────────────────────────────
 # 📦  LOGGING / FILES
 # ───────────────────────────────
 logs:
