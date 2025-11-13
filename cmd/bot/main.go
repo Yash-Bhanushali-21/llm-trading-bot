@@ -2,16 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
-	"llm-trading-bot/internal/eod"
 	"llm-trading-bot/internal/logger"
 	"llm-trading-bot/internal/trace"
+
+	// Commented out imports - will be needed when trading logic is re-enabled
+	// "encoding/json"
+	// "os/signal"
+	// "syscall"
+	// "llm-trading-bot/internal/eod"
 )
 
 func main() {
@@ -45,9 +47,34 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Run PEAD pre-filter to select high-quality stocks
+	// This runs BEFORE the bot starts and filters the universe based on earnings quality
+	// If PEAD fails (e.g., network issues), the bot continues with the original universe
+	if err := runPEADPrefilter(ctx, cfg); err != nil {
+		logger.Warn(ctx, "PEAD pre-filter failed - continuing with original universe", "error", err)
+	}
+
 	// Compress old logs
 	compressOldLogs(ctx)
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// TRADING LOGIC DISABLED - Currently only running PEAD analysis
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Uncomment the section below to enable actual trading with Zerodha
+	// For now, we only run PEAD analysis to select stocks
+
+	logger.Info(ctx, "═══════════════════════════════════════════════════════════════")
+	logger.Info(ctx, "Trading logic is DISABLED - PEAD analysis complete")
+	logger.Info(ctx, "Check 'pead_results.json' for detailed analysis results")
+	logger.Info(ctx, "Selected stocks for trading:", "symbols", cfg.Universe.Static)
+	logger.Info(ctx, "═══════════════════════════════════════════════════════════════")
+	logger.Info(ctx, "To enable trading, uncomment the trading logic in cmd/bot/main.go")
+
+	// Exit gracefully after showing PEAD results
+	logger.Info(ctx, "=== LLM Trading Bot Shutdown (PEAD Analysis Only) ===")
+	return
+
+	/*
 	// Setup signal handling
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
@@ -139,4 +166,5 @@ func main() {
 			return
 		}
 	}
+	*/
 }
