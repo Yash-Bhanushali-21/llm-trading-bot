@@ -156,27 +156,20 @@ func runPEADPrefilter(ctx context.Context, cfg *store.Config) error {
 		nseFetcher := pead.NewNSEDataFetcher()
 		recentSymbols, err := nseFetcher.FetchRecentEarningsAnnouncements(ctx, cfg.PEAD.MaxDaysSinceEarnings)
 		if err != nil {
-			logger.Warn(ctx, "Failed to fetch recent earnings announcements - falling back to broad universe", "error", err)
-			// Fallback to broad universe if API fails
-			symbols = pead.GetNSEBroadUniverse()
-		} else {
-			symbols = recentSymbols
-			logger.Info(ctx, "✅ Discovered companies with recent earnings announcements", "count", len(symbols))
+			logger.Warn(ctx, "Failed to fetch recent earnings announcements", "error", err)
+			return fmt.Errorf("cannot proceed without earnings data - check network connectivity and NSE API access")
 		}
+
+		symbols = recentSymbols
+		logger.Info(ctx, "✅ Discovered companies with recent earnings announcements", "count", len(symbols))
 	}
 
 	logger.Info(ctx, "Analyzing stocks for PEAD qualification", "count", len(symbols))
 	logger.Info(ctx, "Looking for stocks with sudden earnings growth (40-50%+ spikes)")
 
-	// Create data fetcher based on config
-	var fetcher pead.EarningsDataFetcher
-	if cfg.PEAD.DataSource == "MOCK" {
-		logger.Info(ctx, "Using MOCK earnings data for PEAD analysis")
-		fetcher = pead.NewMockEarningsDataFetcher()
-	} else {
-		logger.Info(ctx, "Using LIVE earnings data from NSE sources")
-		fetcher = pead.NewNSEDataFetcher()
-	}
+	// Create data fetcher - only NSE live data
+	fetcher := pead.NewNSEDataFetcher()
+	logger.Info(ctx, "Using LIVE earnings data from NSE sources (Yahoo Finance + NSE API)")
 
 	// Create PEAD config from main config
 	peadConfig := pead.PEADConfig{

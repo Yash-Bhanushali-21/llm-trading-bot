@@ -57,18 +57,12 @@ func main() {
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
-	// Create fetcher based on config
-	var fetcher pead.EarningsDataFetcher
-	if peadConfig.DataSource == "MOCK" {
-		fmt.Println("📊 Using MOCK earnings data for testing")
-		fetcher = pead.NewMockEarningsDataFetcher()
-	} else {
-		fmt.Println("📊 Fetching LIVE earnings data for NSE stocks")
-		fmt.Println("⏳ This may take a few moments...")
-		fmt.Println()
-		// Use NSE-optimized fetcher with Yahoo Finance + fallbacks
-		fetcher = pead.NewNSEDataFetcher()
-	}
+	// Create NSE fetcher - LIVE data only
+	fmt.Println("📊 Fetching LIVE earnings data from NSE sources")
+	fmt.Println("📡 Using Yahoo Finance + NSE API + Screener.in")
+	fmt.Println("⏳ This may take a few moments...")
+	fmt.Println()
+	fetcher := pead.NewNSEDataFetcher()
 
 	// Create analyzer
 	analyzer := pead.NewAnalyzer(peadConfig, fetcher)
@@ -86,34 +80,23 @@ func main() {
 		fmt.Println("📡 Querying NSE API for stocks that reported earnings in last 60 days...")
 		fmt.Println()
 
-		nseFetcher := pead.NewNSEDataFetcher()
 		ctx := context.Background()
-		recentSymbols, err := nseFetcher.FetchRecentEarningsAnnouncements(ctx, 60)
+		recentSymbols, err := fetcher.FetchRecentEarningsAnnouncements(ctx, 60)
 		if err != nil {
-			fmt.Printf("⚠️  Failed to fetch recent earnings: %v\n", err)
-			fmt.Println("📊 Falling back to broad NSE universe...")
-			symbols = pead.GetNSEBroadUniverse()
-		} else {
-			symbols = recentSymbols
-			fmt.Printf("✅ Discovered %d companies with recent earnings announcements\n", len(symbols))
-			fmt.Println("🎯 These stocks reported quarterly results in last 60 days")
-			fmt.Println()
+			fmt.Fprintf(os.Stderr, "❌ Failed to fetch recent earnings: %v\n", err)
+			fmt.Fprintln(os.Stderr, "💡 Ensure network connectivity and NSE API access")
+			os.Exit(1)
 		}
-	}
 
-	// Validate NSE symbols
-	validSymbols := make([]string, 0, len(symbols))
-	for _, symbol := range symbols {
-		if pead.ValidateNSESymbol(symbol) {
-			validSymbols = append(validSymbols, symbol)
-		} else {
-			fmt.Printf("⚠️  Warning: '%s' may not be a valid NSE symbol\n", symbol)
-		}
+		symbols = recentSymbols
+		fmt.Printf("✅ Discovered %d companies with recent earnings announcements\n", len(symbols))
+		fmt.Println("🎯 These stocks reported quarterly results in last 60 days")
+		fmt.Println()
 	}
-	symbols = validSymbols
 
 	if len(symbols) == 0 {
-		fmt.Println("⚠️  No symbols configured for analysis")
+		fmt.Fprintln(os.Stderr, "❌ No symbols available for analysis")
+		fmt.Fprintln(os.Stderr, "💡 Check network connectivity or configure symbols in config.yaml")
 		os.Exit(1)
 	}
 
@@ -142,13 +125,11 @@ func printResults(result *pead.PEADResult) {
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 	fmt.Printf("Analysis Date:      %s\n", result.AnalysisDate.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Total Analyzed:     %d companies\n", result.TotalAnalyzed)
-	fmt.Printf("Qualified:          %d companies (%.1f%%)\n",
-		result.QualifiedCount,
+	fmt.Printf("Qualified:          %d companies (%.1f%%)\n", result.QualifiedCount,
 		float64(result.QualifiedCount)/float64(result.TotalAnalyzed)*100)
-	fmt.Printf("Min Score Filter:   %.1f\n", result.Config.MinCompositeScore)
-	fmt.Println()
+	fmt.Printf("Min Score Filter:   %.1f\n\n", result.Config.MinCompositeScore)
 
-	if result.QualifiedCount == 0 {
+	if len(result.QualifiedSymbols) == 0 {
 		fmt.Println("⚠️  No companies met the qualification criteria")
 		fmt.Println()
 		fmt.Println("Consider:")
@@ -164,8 +145,28 @@ func printResults(result *pead.PEADResult) {
 	fmt.Println()
 
 	for i, score := range result.QualifiedSymbols {
-		printCompanyScore(i+1, &score)
+		fmt.Printf("✅ Rank #%d: %s (%.1f/100 - %s)\n", i+1, score.Symbol, score.CompositeScore, score.Rating)
+		fmt.Println("─────────────────────────────────────────────────────────────")
+		fmt.Printf("  📅 Quarter:           %s (announced %d days ago)\n", score.Quarter, score.DaysSinceEarnings)
+		fmt.Printf("  💰 EPS Surprise:      %.2f%% (Actual: %.2f vs Expected: %.2f)\n",
+			score.EarningsData.EarningSurprise(), score.EarningsData.ActualEPS, score.EarningsData.ExpectedEPS)
+		fmt.Printf("  💵 Revenue Surprise:  %.2f%%\n", score.EarningsData.RevenueSurprise())
+		fmt.Printf("  📈 YoY EPS Growth:    %.1f%%\n", score.EarningsData.YoYEPSGrowth)
+		fmt.Printf("  📈 YoY Revenue Growth: %.1f%%\n", score.EarningsData.YoYRevenueGrowth)
+		fmt.Printf("  💹 Net Margin:        %.1f%% (↑ %.1f%%)\n",
+			score.EarningsData.NetMargin, score.EarningsData.NetMargin-score.EarningsData.PrevNetMargin)
+		fmt.Printf("  🎯 Consistency:       %d consecutive beats\n", score.EarningsData.ConsecutiveBeats)
 		fmt.Println()
+
+		fmt.Println("  Component Scores:")
+		fmt.Printf("    • Earnings Surprise:    %.1f/100\n", score.EarningsSurpriseScore)
+		fmt.Printf("    • Earnings Growth:      %.1f/100\n", score.EarningsGrowthScore)
+		fmt.Printf("    • Revenue Growth:       %.1f/100\n", score.RevenueGrowthScore)
+		fmt.Printf("    • Margin Expansion:     %.1f/100\n", score.MarginExpansionScore)
+		fmt.Printf("    • Consistency:          %.1f/100\n", score.ConsistencyScore)
+		fmt.Println()
+
+		fmt.Printf("  📝 %s\n\n", score.Commentary)
 	}
 
 	fmt.Println("═══════════════════════════════════════════════════════════════")
@@ -175,93 +176,19 @@ func printResults(result *pead.PEADResult) {
 	fmt.Println("  2. Add top picks to universe_static in config.yaml")
 	fmt.Println("  3. Run the trading bot to analyze these symbols")
 	fmt.Println("  4. Monitor PEAD drift over the next 30-60 days")
-	fmt.Println()
-}
-
-func printCompanyScore(rank int, score *pead.PEADScore) {
-	data := &score.EarningsData
-
-	// Rating emoji
-	emoji := "📊"
-	switch score.Rating {
-	case "STRONG_BUY":
-		emoji = "🔥"
-	case "BUY":
-		emoji = "✅"
-	case "HOLD":
-		emoji = "⚠️"
-	case "AVOID":
-		emoji = "❌"
-	}
-
-	fmt.Printf("%s Rank #%d: %s (%.1f/100 - %s)\n",
-		emoji, rank, score.Symbol, score.CompositeScore, score.Rating)
-	fmt.Println("─────────────────────────────────────────────────────────────")
-
-	// Earnings announcement details
-	fmt.Printf("  📅 Quarter:           %s (announced %d days ago)\n",
-		data.Quarter, score.DaysSinceEarnings)
-
-	// Surprises
-	fmt.Printf("  💰 EPS Surprise:      %.2f%% (Actual: %.2f vs Expected: %.2f)\n",
-		data.EarningSurprise(), data.ActualEPS, data.ExpectedEPS)
-	fmt.Printf("  💵 Revenue Surprise:  %.2f%%\n", data.RevenueSurprise())
-
-	// Growth metrics
-	fmt.Printf("  📈 YoY EPS Growth:    %.1f%%\n", data.YoYEPSGrowth)
-	fmt.Printf("  📈 YoY Revenue Growth: %.1f%%\n", data.YoYRevenueGrowth)
-
-	// Margins
-	if data.NetMarginChange() > 0 {
-		fmt.Printf("  💹 Net Margin:        %.1f%% (↑ %.1f%%)\n",
-			data.NetMargin, data.NetMarginChange())
-	} else if data.NetMarginChange() < 0 {
-		fmt.Printf("  💹 Net Margin:        %.1f%% (↓ %.1f%%)\n",
-			data.NetMargin, abs(data.NetMarginChange()))
-	} else {
-		fmt.Printf("  💹 Net Margin:        %.1f%% (unchanged)\n", data.NetMargin)
-	}
-
-	// Consistency
-	if data.ConsecutiveBeats > 0 {
-		fmt.Printf("  🎯 Consistency:       %d consecutive beats\n", data.ConsecutiveBeats)
-	}
-
-	// Component scores
-	fmt.Println()
-	fmt.Println("  Component Scores:")
-	fmt.Printf("    • Earnings Surprise:    %.1f/100\n", score.EarningsSurpriseScore)
-	fmt.Printf("    • Earnings Growth:      %.1f/100\n", score.EarningsGrowthScore)
-	fmt.Printf("    • Revenue Growth:       %.1f/100\n", score.RevenueGrowthScore)
-	fmt.Printf("    • Margin Expansion:     %.1f/100\n", score.MarginExpansionScore)
-	fmt.Printf("    • Consistency:          %.1f/100\n", score.ConsistencyScore)
-
-	// Commentary
-	fmt.Println()
-	fmt.Printf("  📝 %s\n", score.Commentary)
 }
 
 func saveResultsJSON(result *pead.PEADResult, filename string) {
-	file, err := os.Create(filename)
+	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create JSON file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to marshal results: %v\n", err)
 		return
 	}
-	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(result); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write JSON: %v\n", err)
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write file: %v\n", err)
 		return
 	}
 
 	fmt.Printf("💾 Results saved to %s\n", filename)
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }

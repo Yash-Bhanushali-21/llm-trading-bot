@@ -105,129 +105,6 @@ func (n *NSEDataFetcher) fetchFromScreener(ctx context.Context, symbol string) (
 	return nil, fmt.Errorf("screener.in integration not yet implemented - use Yahoo Finance or add API key")
 }
 
-// ValidateNSESymbol checks if a symbol is a valid NSE stock code
-func ValidateNSESymbol(symbol string) bool {
-	// NSE symbols are typically:
-	// - All uppercase
-	// - Alphanumeric
-	// - 1-10 characters
-	// - No special characters except & (for some stocks)
-
-	if len(symbol) == 0 || len(symbol) > 10 {
-		return false
-	}
-
-	// Check if already has exchange suffix
-	if strings.HasSuffix(symbol, ".NS") || strings.HasSuffix(symbol, ".BO") {
-		return true
-	}
-
-	// Common NSE stocks
-	commonNSEStocks := map[string]bool{
-		"RELIANCE": true, "TCS": true, "HDFCBANK": true, "INFY": true,
-		"ICICIBANK": true, "HINDUNILVR": true, "SBIN": true, "BHARTIARTL": true,
-		"BAJFINANCE": true, "ITC": true, "KOTAKBANK": true, "LT": true,
-		"AXISBANK": true, "ASIANPAINT": true, "MARUTI": true, "TITAN": true,
-		"SUNPHARMA": true, "ULTRACEMCO": true, "NESTLEIND": true, "HCLTECH": true,
-		"WIPRO": true, "TATAMOTORS": true, "TATASTEEL": true, "POWERGRID": true,
-		"NTPC": true, "ONGC": true, "COALINDIA": true, "JSWSTEEL": true,
-		"GRASIM": true, "TECHM": true, "BAJAJFINSV": true, "HDFCLIFE": true,
-		"DIVISLAB": true, "BRITANNIA": true, "INDUSINDBK": true, "ADANIENT": true,
-		"ADANIPORTS": true, "SHREECEM": true, "DRREDDY": true, "APOLLOHOSP": true,
-		"BPCL": true, "CIPLA": true, "EICHERMOT": true, "HEROMOTOCO": true,
-		"HINDALCO": true, "M&M": true, "TATACONSUM": true, "HAL": true,
-		"UPL": true, "VEDL": true,
-	}
-
-	return commonNSEStocks[symbol]
-}
-
-// GetNSETop50 returns the NSE Nifty 50 stock symbols
-func GetNSETop50() []string {
-	return []string{
-		"RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
-		"HINDUNILVR", "SBIN", "BHARTIARTL", "BAJFINANCE", "ITC",
-		"KOTAKBANK", "LT", "AXISBANK", "ASIANPAINT", "MARUTI",
-		"TITAN", "SUNPHARMA", "ULTRACEMCO", "NESTLEIND", "HCLTECH",
-		"WIPRO", "TATAMOTORS", "TATASTEEL", "POWERGRID", "NTPC",
-		"ONGC", "COALINDIA", "JSWSTEEL", "GRASIM", "TECHM",
-		"BAJAJFINSV", "HDFCLIFE", "DIVISLAB", "BRITANNIA", "INDUSINDBK",
-		"ADANIENT", "ADANIPORTS", "SHREECEM", "DRREDDY", "APOLLOHOSP",
-		"BPCL", "CIPLA", "EICHERMOT", "HEROMOTOCO", "HINDALCO",
-		"M&M", "TATACONSUM", "UPL", "VEDL", "HAL",
-	}
-}
-
-// GetNSEMidcap returns popular NSE midcap stocks
-func GetNSEMidcap() []string {
-	return []string{
-		"GODREJCP", "PIDILITIND", "BERGEPAINT", "HAVELLS", "SBICARD",
-		"BANDHANBNK", "MCDOWELL-N", "BANKBARODA", "GAIL", "INDIGO",
-		"SIEMENS", "DLF", "AMBUJACEM", "TORNTPHARM", "LUPIN",
-		"NAUKRI", "MOTHERSON", "ABCAPITAL", "ESCORTS", "TVSMOTOR",
-		"IDEA", "DIXON", "PERSISTENT", "LTIM", "COFORGE",
-		"SAIL", "MUTHOOTFIN", "NMDC", "CHOLAFIN", "LICHSGFIN",
-	}
-}
-
-// GetNSENext50 returns the NSE Nifty Next 50 stock symbols
-func GetNSENext50() []string {
-	return []string{
-		"ADANIGREEN", "ADANIPOWER", "ATGL", "BAJAJHLDNG", "BEL",
-		"BOSCHLTD", "CANBK", "COLPAL", "DMART", "GLAND",
-		"GODREJCP", "HAVELLS", "HINDPETRO", "ICICIPRULI", "INDUSTOWER",
-		"INDUSINDBK", "IOC", "IRCTC", "ITC", "JINDALSTEL",
-		"LAURUSLABS", "LICHSGFIN", "LTIM", "LUPIN", "MARICO",
-		"NAUKRI", "NMDC", "OBEROIRLTY", "OFSS", "PAGEIND",
-		"PERSISTENT", "PETRONET", "PIDILITIND", "PNB", "RECLTD",
-		"SBILIFE", "SHRIRAMFIN", "SIEMENS", "SRF", "TATACOMM",
-		"TATAPOWER", "TORNTPHARM", "TRENT", "VOLTAS", "ZOMATO",
-		"ABB", "ALKEM", "AMBUJACEM", "ASTRAL", "AUROPHARMA",
-	}
-}
-
-// GetNSESmallcap returns popular NSE smallcap stocks with growth potential
-func GetNSESmallcap() []string {
-	return []string{
-		"ZYDUSLIFE", "CROMPTON", "MPHASIS", "JINDALSTEL", "INDHOTEL",
-		"CHAMBLFERT", "GMRINFRA", "IDFCFIRSTB", "PFC", "IRFC",
-		"NATIONALUM", "RBLBANK", "CONCOR", "BALKRISIND", "SUPREMEIND",
-		"PIIND", "CUMMINSIND", "DEEPAKNTR", "FLUOROCHEM", "AARTIIND",
-		"APLAPOLLO", "ASHOKLEY", "BATAINDIA", "CANFINHOME", "CREDITACC",
-		"DELTACORP", "FINEORG", "GODREJAGRO", "GRINDWELL", "HFCL",
-		"IIFL", "INTELLECT", "JKCEMENT", "JUBLPHARMA", "KPITTECH",
-		"LALPATHLAB", "MANAPPURAM", "NATIONALUM", "NAVINFLUOR", "NHPC",
-		"PAGEIND", "PFIZER", "POLYCAB", "RAMCOCEM", "RATNAMANI",
-		"SOLARINDS", "SUMICHEM", "TATACHEM", "THYROCARE", "TORNTPOWER",
-	}
-}
-
-// GetNSEBroadUniverse returns a comprehensive NSE universe for PEAD discovery
-// This includes Nifty 50, Next 50, Midcap, and Smallcap stocks (~200+ stocks)
-// Use this for discovering new opportunities with sudden earnings growth
-// DEPRECATED: Use FetchRecentEarningsAnnouncements() for dynamic discovery
-func GetNSEBroadUniverse() []string {
-	universe := make([]string, 0, 250)
-
-	// Add all segments
-	universe = append(universe, GetNSETop50()...)
-	universe = append(universe, GetNSENext50()...)
-	universe = append(universe, GetNSEMidcap()...)
-	universe = append(universe, GetNSESmallcap()...)
-
-	// Remove duplicates
-	seen := make(map[string]bool)
-	unique := make([]string, 0, len(universe))
-	for _, symbol := range universe {
-		if !seen[symbol] {
-			seen[symbol] = true
-			unique = append(unique, symbol)
-		}
-	}
-
-	return unique
-}
-
 // EarningsAnnouncement represents a company's earnings announcement
 type EarningsAnnouncement struct {
 	Symbol           string    `json:"symbol"`
@@ -372,11 +249,11 @@ func (n *NSEDataFetcher) fetchScreenerRecentResults(ctx context.Context, daysBac
 type NSEQuarterlyResults struct {
 	Symbol  string `json:"symbol"`
 	Results []struct {
-		Quarter     string  `json:"quarter"`
-		Sales       float64 `json:"sales"`
-		NetProfit   float64 `json:"netProfit"`
-		EPS         float64 `json:"eps"`
-		Date        string  `json:"date"`
+		Quarter   string  `json:"quarter"`
+		Sales     float64 `json:"sales"`
+		NetProfit float64 `json:"netProfit"`
+		EPS       float64 `json:"eps"`
+		Date      string  `json:"date"`
 	} `json:"results"`
 }
 
