@@ -205,6 +205,7 @@ func GetNSESmallcap() []string {
 // GetNSEBroadUniverse returns a comprehensive NSE universe for PEAD discovery
 // This includes Nifty 50, Next 50, Midcap, and Smallcap stocks (~200+ stocks)
 // Use this for discovering new opportunities with sudden earnings growth
+// DEPRECATED: Use FetchRecentEarningsAnnouncements() for dynamic discovery
 func GetNSEBroadUniverse() []string {
 	universe := make([]string, 0, 250)
 
@@ -225,6 +226,145 @@ func GetNSEBroadUniverse() []string {
 	}
 
 	return unique
+}
+
+// EarningsAnnouncement represents a company's earnings announcement
+type EarningsAnnouncement struct {
+	Symbol           string    `json:"symbol"`
+	CompanyName      string    `json:"company_name"`
+	AnnouncementDate time.Time `json:"announcement_date"`
+	Quarter          string    `json:"quarter"`
+	FiscalYear       int       `json:"fiscal_year"`
+}
+
+// FetchRecentEarningsAnnouncements fetches companies that announced earnings in the last N days
+// This is the dynamic approach - discovers stocks with fresh earnings instead of hardcoded lists
+func (n *NSEDataFetcher) FetchRecentEarningsAnnouncements(ctx context.Context, daysBack int) ([]string, error) {
+	symbols := make([]string, 0)
+
+	// Try multiple sources for earnings announcements
+
+	// Source 1: NSE Corporate Announcements API
+	nseSymbols, err := n.fetchNSECorporateAnnouncements(ctx, daysBack)
+	if err == nil && len(nseSymbols) > 0 {
+		symbols = append(symbols, nseSymbols...)
+	}
+
+	// Source 2: MoneyControl earnings calendar
+	mcSymbols, err := n.fetchMoneyControlEarnings(ctx, daysBack)
+	if err == nil && len(mcSymbols) > 0 {
+		symbols = append(symbols, mcSymbols...)
+	}
+
+	// Source 3: Screener.in recent results
+	screenerSymbols, err := n.fetchScreenerRecentResults(ctx, daysBack)
+	if err == nil && len(screenerSymbols) > 0 {
+		symbols = append(symbols, screenerSymbols...)
+	}
+
+	// Remove duplicates
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		if !seen[symbol] {
+			seen[symbol] = true
+			unique = append(unique, symbol)
+		}
+	}
+
+	if len(unique) == 0 {
+		return nil, fmt.Errorf("no recent earnings announcements found from any source")
+	}
+
+	return unique, nil
+}
+
+// fetchNSECorporateAnnouncements fetches recent earnings from NSE corporate actions
+func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, daysBack int) ([]string, error) {
+	// NSE Corporate Announcements endpoint
+	// https://www.nseindia.com/api/corporates-financial-results
+
+	url := "https://www.nseindia.com/api/corporates-financial-results?index=equities"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create NSE request: %w", err)
+	}
+
+	// NSE requires specific headers
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Referer", "https://www.nseindia.com/")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("NSE API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("NSE API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read NSE response: %w", err)
+	}
+
+	// Parse NSE response
+	var data struct {
+		Data []struct {
+			Symbol  string `json:"symbol"`
+			XDate   string `json:"xdate"` // Announcement date
+			Purpose string `json:"purpose"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("failed to parse NSE response: %w", err)
+	}
+
+	// Filter for recent earnings announcements
+	cutoffDate := time.Now().AddDate(0, 0, -daysBack)
+	symbols := make([]string, 0)
+
+	for _, item := range data.Data {
+		// Check if it's a financial results announcement
+		if !strings.Contains(strings.ToLower(item.Purpose), "result") &&
+			!strings.Contains(strings.ToLower(item.Purpose), "financial") {
+			continue
+		}
+
+		// Parse date
+		announcementDate, err := time.Parse("02-Jan-2006", item.XDate)
+		if err != nil {
+			continue
+		}
+
+		// Check if within our timeframe
+		if announcementDate.After(cutoffDate) {
+			symbols = append(symbols, item.Symbol)
+		}
+	}
+
+	return symbols, nil
+}
+
+// fetchMoneyControlEarnings fetches from MoneyControl earnings calendar
+func (n *NSEDataFetcher) fetchMoneyControlEarnings(ctx context.Context, daysBack int) ([]string, error) {
+	// MoneyControl has an earnings calendar API
+	// This would need to be implemented with proper scraping or API access
+	// For now, return empty to indicate not implemented
+	return nil, fmt.Errorf("MoneyControl earnings calendar not yet implemented")
+}
+
+// fetchScreenerRecentResults fetches from Screener.in recent results page
+func (n *NSEDataFetcher) fetchScreenerRecentResults(ctx context.Context, daysBack int) ([]string, error) {
+	// Screener.in shows recent quarterly results
+	// This would need web scraping or API access
+	return nil, fmt.Errorf("Screener.in recent results not yet implemented")
 }
 
 // NSEQuarterlyResultsAPI represents NSE quarterly results structure

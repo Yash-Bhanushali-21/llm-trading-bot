@@ -149,9 +149,20 @@ func runPEADPrefilter(ctx context.Context, cfg *store.Config) error {
 	// Determine symbols to analyze
 	symbols := cfg.Universe.Static
 	if len(symbols) == 0 {
-		logger.Info(ctx, "No symbols configured - using broad NSE universe for PEAD discovery")
-		logger.Info(ctx, "Scanning across Nifty 50, Next 50, Midcap, and Smallcap stocks")
-		symbols = pead.GetNSEBroadUniverse()
+		logger.Info(ctx, "No symbols configured - fetching companies with recent earnings announcements")
+		logger.Info(ctx, "Querying NSE API for stocks that reported earnings in last 60 days...")
+
+		// Use NSE fetcher to get companies with recent earnings
+		nseFetcher := pead.NewNSEDataFetcher()
+		recentSymbols, err := nseFetcher.FetchRecentEarningsAnnouncements(ctx, cfg.PEAD.MaxDaysSinceEarnings)
+		if err != nil {
+			logger.Warn(ctx, "Failed to fetch recent earnings announcements - falling back to broad universe", "error", err)
+			// Fallback to broad universe if API fails
+			symbols = pead.GetNSEBroadUniverse()
+		} else {
+			symbols = recentSymbols
+			logger.Info(ctx, "✅ Discovered companies with recent earnings announcements", "count", len(symbols))
+		}
 	}
 
 	logger.Info(ctx, "Analyzing stocks for PEAD qualification", "count", len(symbols))

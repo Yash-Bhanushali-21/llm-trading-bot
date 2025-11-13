@@ -80,12 +80,25 @@ func main() {
 		symbols = cfg.Universe.Static
 	}
 
-	// If still no symbols, use broad NSE universe for discovery
+	// If still no symbols, fetch companies with recent earnings announcements
 	if len(symbols) == 0 {
-		fmt.Println("ℹ️  No symbols configured - using broad NSE universe for discovery")
-		fmt.Println("📊 Scanning: Nifty 50, Next 50, Midcap, and Smallcap stocks")
-		fmt.Println("🎯 Looking for stocks with sudden earnings growth (40-50%+ spikes)")
-		symbols = pead.GetNSEBroadUniverse()
+		fmt.Println("ℹ️  No symbols configured - fetching companies with recent earnings announcements")
+		fmt.Println("📡 Querying NSE API for stocks that reported earnings in last 60 days...")
+		fmt.Println()
+
+		nseFetcher := pead.NewNSEDataFetcher()
+		ctx := context.Background()
+		recentSymbols, err := nseFetcher.FetchRecentEarningsAnnouncements(ctx, 60)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to fetch recent earnings: %v\n", err)
+			fmt.Println("📊 Falling back to broad NSE universe...")
+			symbols = pead.GetNSEBroadUniverse()
+		} else {
+			symbols = recentSymbols
+			fmt.Printf("✅ Discovered %d companies with recent earnings announcements\n", len(symbols))
+			fmt.Println("🎯 These stocks reported quarterly results in last 60 days")
+			fmt.Println()
+		}
 	}
 
 	// Validate NSE symbols
