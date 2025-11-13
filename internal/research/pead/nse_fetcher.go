@@ -170,6 +170,63 @@ func GetNSEMidcap() []string {
 	}
 }
 
+// GetNSENext50 returns the NSE Nifty Next 50 stock symbols
+func GetNSENext50() []string {
+	return []string{
+		"ADANIGREEN", "ADANIPOWER", "ATGL", "BAJAJHLDNG", "BEL",
+		"BOSCHLTD", "CANBK", "COLPAL", "DMART", "GLAND",
+		"GODREJCP", "HAVELLS", "HINDPETRO", "ICICIPRULI", "INDUSTOWER",
+		"INDUSINDBK", "IOC", "IRCTC", "ITC", "JINDALSTEL",
+		"LAURUSLABS", "LICHSGFIN", "LTIM", "LUPIN", "MARICO",
+		"NAUKRI", "NMDC", "OBEROIRLTY", "OFSS", "PAGEIND",
+		"PERSISTENT", "PETRONET", "PIDILITIND", "PNB", "RECLTD",
+		"SBILIFE", "SHRIRAMFIN", "SIEMENS", "SRF", "TATACOMM",
+		"TATAPOWER", "TORNTPHARM", "TRENT", "VOLTAS", "ZOMATO",
+		"ABB", "ALKEM", "AMBUJACEM", "ASTRAL", "AUROPHARMA",
+	}
+}
+
+// GetNSESmallcap returns popular NSE smallcap stocks with growth potential
+func GetNSESmallcap() []string {
+	return []string{
+		"ZYDUSLIFE", "CROMPTON", "MPHASIS", "JINDALSTEL", "INDHOTEL",
+		"CHAMBLFERT", "GMRINFRA", "IDFCFIRSTB", "PFC", "IRFC",
+		"NATIONALUM", "RBLBANK", "CONCOR", "BALKRISIND", "SUPREMEIND",
+		"PIIND", "CUMMINSIND", "DEEPAKNTR", "FLUOROCHEM", "AARTIIND",
+		"APLAPOLLO", "ASHOKLEY", "BATAINDIA", "CANFINHOME", "CREDITACC",
+		"DELTACORP", "FINEORG", "GODREJAGRO", "GRINDWELL", "HFCL",
+		"IIFL", "INTELLECT", "JKCEMENT", "JUBLPHARMA", "KPITTECH",
+		"LALPATHLAB", "MANAPPURAM", "NATIONALUM", "NAVINFLUOR", "NHPC",
+		"PAGEIND", "PFIZER", "POLYCAB", "RAMCOCEM", "RATNAMANI",
+		"SOLARINDS", "SUMICHEM", "TATACHEM", "THYROCARE", "TORNTPOWER",
+	}
+}
+
+// GetNSEBroadUniverse returns a comprehensive NSE universe for PEAD discovery
+// This includes Nifty 50, Next 50, Midcap, and Smallcap stocks (~200+ stocks)
+// Use this for discovering new opportunities with sudden earnings growth
+func GetNSEBroadUniverse() []string {
+	universe := make([]string, 0, 250)
+
+	// Add all segments
+	universe = append(universe, GetNSETop50()...)
+	universe = append(universe, GetNSENext50()...)
+	universe = append(universe, GetNSEMidcap()...)
+	universe = append(universe, GetNSESmallcap()...)
+
+	// Remove duplicates
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(universe))
+	for _, symbol := range universe {
+		if !seen[symbol] {
+			seen[symbol] = true
+			unique = append(unique, symbol)
+		}
+	}
+
+	return unique
+}
+
 // NSEQuarterlyResultsAPI represents NSE quarterly results structure
 // Based on NSE India's official corporate API
 type NSEQuarterlyResults struct {

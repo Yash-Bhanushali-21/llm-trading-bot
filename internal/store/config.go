@@ -106,8 +106,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid data_source '%s': must be 'STATIC' or 'LIVE'", c.DataSource)
 	}
 	// Support both old and new universe config
-	if len(c.UniverseStatic) == 0 && len(c.Universe.Static) == 0 {
-		return errors.New("universe_static cannot be empty")
+	// Allow empty universe if PEAD is enabled (it will discover stocks dynamically)
+	if len(c.UniverseStatic) == 0 && len(c.Universe.Static) == 0 && !c.PEAD.Enabled {
+		return errors.New("universe_static cannot be empty (unless PEAD is enabled for discovery)")
 	}
 	if c.Risk.PerTradeRiskPct <= 0 || c.Risk.PerTradeRiskPct > 100 {
 		return fmt.Errorf("risk.per_trade_risk_pct must be between 0-100, got %.2f", c.Risk.PerTradeRiskPct)

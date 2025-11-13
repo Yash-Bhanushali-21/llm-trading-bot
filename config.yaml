@@ -12,12 +12,9 @@ exchange: NSE
 universe_mode: STATIC   # STATIC | DYNAMIC
 
 # Static universe for quick testing
-universe_static:
-  - RELIANCE
-  - TCS
-  - HDFCBANK
-  - INFY
-  - ICICIBANK
+# Leave empty to enable PEAD discovery across broad NSE universe (200+ stocks)
+# PEAD will scan Nifty 50, Next 50, Midcap, and Smallcap to find sudden earnings growth
+universe_static: []
 
 # Dynamic universe (auto filter)
 universe_dynamic:

@@ -149,11 +149,13 @@ func runPEADPrefilter(ctx context.Context, cfg *store.Config) error {
 	// Determine symbols to analyze
 	symbols := cfg.Universe.Static
 	if len(symbols) == 0 {
-		logger.Info(ctx, "No symbols in config, using NSE Nifty 50 for PEAD analysis")
-		symbols = pead.GetNSETop50()
+		logger.Info(ctx, "No symbols configured - using broad NSE universe for PEAD discovery")
+		logger.Info(ctx, "Scanning across Nifty 50, Next 50, Midcap, and Smallcap stocks")
+		symbols = pead.GetNSEBroadUniverse()
 	}
 
 	logger.Info(ctx, "Analyzing stocks for PEAD qualification", "count", len(symbols))
+	logger.Info(ctx, "Looking for stocks with sudden earnings growth (40-50%+ spikes)")
 
 	// Create data fetcher based on config
 	var fetcher pead.EarningsDataFetcher

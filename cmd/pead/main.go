@@ -80,10 +80,12 @@ func main() {
 		symbols = cfg.Universe.Static
 	}
 
-	// If still no symbols, use NSE Top 50 as default
+	// If still no symbols, use broad NSE universe for discovery
 	if len(symbols) == 0 {
-		fmt.Println("ℹ️  No symbols configured, using NSE Nifty 50 stocks")
-		symbols = pead.GetNSETop50()
+		fmt.Println("ℹ️  No symbols configured - using broad NSE universe for discovery")
+		fmt.Println("📊 Scanning: Nifty 50, Next 50, Midcap, and Smallcap stocks")
+		fmt.Println("🎯 Looking for stocks with sudden earnings growth (40-50%+ spikes)")
+		symbols = pead.GetNSEBroadUniverse()
 	}
 
 	// Validate NSE symbols
