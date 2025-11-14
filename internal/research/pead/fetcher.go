@@ -28,6 +28,7 @@ func NewYahooFinanceEarningsDataFetcher() *YahooFinanceEarningsDataFetcher {
 	// Create API client with Yahoo Finance specific configuration
 	client := api.NewClient(
 		api.WithTimeout(30*time.Second),
+		api.WithLogging(true), // Enable API logging
 	)
 
 	return &YahooFinanceEarningsDataFetcher{

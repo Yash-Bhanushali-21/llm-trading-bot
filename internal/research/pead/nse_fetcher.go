@@ -23,6 +23,7 @@ func NewNSEDataFetcher() *NSEDataFetcher {
 	// Create API client with longer timeout for NSE APIs
 	client := api.NewClient(
 		api.WithTimeout(45*time.Second),
+		api.WithLogging(true), // Enable API logging
 	)
 
 	return &NSEDataFetcher{
@@ -163,11 +164,16 @@ func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, day
 	// NSE Corporate Announcements endpoint
 	url := "https://www.nseindia.com/api/corporates-financial-results?index=equities"
 
+	fmt.Printf("\n🔍 [NSE API] Making request to: %s\n", url)
+
 	// Make GET request using centralized API client with NSE-specific headers
 	resp, err := n.client.GET(ctx, url, api.NSEHeaders())
 	if err != nil {
+		fmt.Printf("❌ [NSE API] Request failed: %v\n", err)
 		return nil, fmt.Errorf("NSE API request failed: %w", err)
 	}
+
+	fmt.Printf("✅ [NSE API] Response received: Status=%d, Size=%d bytes\n", resp.StatusCode, len(resp.Body))
 
 	// Parse NSE response
 	var data struct {
@@ -179,12 +185,23 @@ func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, day
 	}
 
 	if err := resp.ParseJSON(&data); err != nil {
+		fmt.Printf("❌ [NSE API] JSON parsing failed: %v\n", err)
+		maxLen := 500
+		if len(resp.Body) < maxLen {
+			maxLen = len(resp.Body)
+		}
+		fmt.Printf("📄 [NSE API] Raw response: %s\n", string(resp.Body[:maxLen]))
 		return nil, fmt.Errorf("failed to parse NSE response: %w", err)
 	}
+
+	fmt.Printf("📊 [NSE API] Total announcements received: %d\n", len(data.Data))
 
 	// Filter for recent earnings announcements
 	cutoffDate := time.Now().AddDate(0, 0, -daysBack)
 	symbols := make([]string, 0)
+
+	matchedPurpose := 0
+	matchedDate := 0
 
 	for _, item := range data.Data {
 		// Check if it's a financial results announcement
@@ -192,18 +209,29 @@ func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, day
 			!strings.Contains(strings.ToLower(item.Purpose), "financial") {
 			continue
 		}
+		matchedPurpose++
 
 		// Parse date
 		announcementDate, err := time.Parse("02-Jan-2006", item.XDate)
 		if err != nil {
+			fmt.Printf("⚠️  [NSE API] Failed to parse date '%s' for %s\n", item.XDate, item.Symbol)
 			continue
 		}
 
 		// Check if within our timeframe
 		if announcementDate.After(cutoffDate) {
 			symbols = append(symbols, item.Symbol)
+			matchedDate++
+			if len(symbols) <= 5 {
+				fmt.Printf("  ✓ %s - %s (%s)\n", item.Symbol, item.XDate, item.Purpose)
+			}
 		}
 	}
+
+	fmt.Printf("📌 [NSE API] Filtered results:\n")
+	fmt.Printf("  - Matched purpose filter (result/financial): %d\n", matchedPurpose)
+	fmt.Printf("  - Within %d days timeframe: %d\n", daysBack, matchedDate)
+	fmt.Printf("  - Final symbols: %d\n", len(symbols))
 
 	return symbols, nil
 }
