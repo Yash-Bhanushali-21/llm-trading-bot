@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"llm-trading-bot/internal/logger"
 	"net/http"
 	"time"
 )
@@ -15,34 +16,35 @@ type Client struct {
 	httpClient *http.Client
 	baseURL    string
 	headers    map[string]string
-	logger     Logger
+	useLogging bool
 }
 
-// Logger interface for logging HTTP requests and responses
-type Logger interface {
-	Debug(ctx context.Context, msg string, args ...interface{})
-	Info(ctx context.Context, msg string, args ...interface{})
-	Warn(ctx context.Context, msg string, args ...interface{})
-	Error(ctx context.Context, msg string, args ...interface{})
+// logDebug logs debug messages using the global logger
+func (c *Client) logDebug(ctx context.Context, msg string, args ...interface{}) {
+	if c.useLogging {
+		logger.Debug(ctx, msg, args...)
+	}
 }
 
-// defaultLogger is a simple logger that prints to stdout
-type defaultLogger struct{}
-
-func (d *defaultLogger) Debug(ctx context.Context, msg string, args ...interface{}) {
-	fmt.Printf("[DEBUG] %s %v\n", msg, args)
+// logInfo logs info messages using the global logger
+func (c *Client) logInfo(ctx context.Context, msg string, args ...interface{}) {
+	if c.useLogging {
+		logger.Info(ctx, msg, args...)
+	}
 }
 
-func (d *defaultLogger) Info(ctx context.Context, msg string, args ...interface{}) {
-	fmt.Printf("[INFO] %s %v\n", msg, args)
+// logWarn logs warning messages using the global logger
+func (c *Client) logWarn(ctx context.Context, msg string, args ...interface{}) {
+	if c.useLogging {
+		logger.Warn(ctx, msg, args...)
+	}
 }
 
-func (d *defaultLogger) Warn(ctx context.Context, msg string, args ...interface{}) {
-	fmt.Printf("[WARN] %s %v\n", msg, args)
-}
-
-func (d *defaultLogger) Error(ctx context.Context, msg string, args ...interface{}) {
-	fmt.Printf("[ERROR] %s %v\n", msg, args)
+// logError logs error messages using the global logger
+func (c *Client) logError(ctx context.Context, msg string, args ...interface{}) {
+	if c.useLogging {
+		logger.Error(ctx, msg, args...)
+	}
 }
 
 // ClientOption configures the API client
@@ -69,10 +71,10 @@ func WithHeader(key, value string) ClientOption {
 	}
 }
 
-// WithLogger sets a custom logger
-func WithLogger(logger Logger) ClientOption {
+// WithLogging enables logging for the API client
+func WithLogging(enabled bool) ClientOption {
 	return func(c *Client) {
-		c.logger = logger
+		c.useLogging = enabled
 	}
 }
 
@@ -82,8 +84,8 @@ func NewClient(opts ...ClientOption) *Client {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		headers: make(map[string]string),
-		logger:  &defaultLogger{},
+		headers:    make(map[string]string),
+		useLogging: false, // Default: logging disabled for performance
 	}
 
 	// Apply options
@@ -151,7 +153,7 @@ func (c *Client) Do(req *Request) (*Response, error) {
 	if req.Body != nil {
 		jsonBody, err := json.Marshal(req.Body)
 		if err != nil {
-			c.logger.Error(req.ctx, "Failed to marshal request body", "error", err)
+			c.logError(req.ctx, "Failed to marshal request body", "error", err)
 			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		bodyReader = bytes.NewReader(jsonBody)
@@ -160,7 +162,7 @@ func (c *Client) Do(req *Request) (*Response, error) {
 	// Create HTTP request
 	httpReq, err := http.NewRequestWithContext(req.ctx, req.Method, url, bodyReader)
 	if err != nil {
-		c.logger.Error(req.ctx, "Failed to create HTTP request", "error", err)
+		c.logError(req.ctx, "Failed to create HTTP request", "error", err)
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
@@ -180,13 +182,13 @@ func (c *Client) Do(req *Request) (*Response, error) {
 	}
 
 	// Log request
-	c.logger.Debug(req.ctx, "HTTP Request", "method", req.Method, "url", url)
+	c.logDebug(req.ctx, "HTTP Request", "method", req.Method, "url", url)
 
 	// Execute request
 	startTime := time.Now()
 	httpResp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		c.logger.Error(req.ctx, "HTTP request failed", "method", req.Method, "url", url, "error", err)
+		c.logError(req.ctx, "HTTP request failed", "method", req.Method, "url", url, "error", err)
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer httpResp.Body.Close()
@@ -194,13 +196,13 @@ func (c *Client) Do(req *Request) (*Response, error) {
 	// Read response body
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		c.logger.Error(req.ctx, "Failed to read response body", "error", err)
+		c.logError(req.ctx, "Failed to read response body", "error", err)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// Log response
 	duration := time.Since(startTime)
-	c.logger.Debug(req.ctx, "HTTP Response",
+	c.logDebug(req.ctx, "HTTP Response",
 		"method", req.Method,
 		"url", url,
 		"status", httpResp.StatusCode,
@@ -209,7 +211,7 @@ func (c *Client) Do(req *Request) (*Response, error) {
 
 	// Check for error status codes
 	if httpResp.StatusCode >= 400 {
-		c.logger.Warn(req.ctx, "HTTP error response",
+		c.logWarn(req.ctx, "HTTP error response",
 			"method", req.Method,
 			"url", url,
 			"status", httpResp.StatusCode,
@@ -371,7 +373,7 @@ func (c *Client) DoWithRetry(req *Request, config *RetryConfig) (*Response, erro
 	waitTime := config.InitialWait
 
 	for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
-		c.logger.Debug(req.ctx, "Request attempt", "attempt", attempt, "maxAttempts", config.MaxAttempts)
+		c.logDebug(req.ctx, "Request attempt", "attempt", attempt, "maxAttempts", config.MaxAttempts)
 
 		resp, err := c.Do(req)
 		if err == nil {
@@ -379,7 +381,7 @@ func (c *Client) DoWithRetry(req *Request, config *RetryConfig) (*Response, erro
 		}
 
 		lastErr = err
-		c.logger.Warn(req.ctx, "Request failed, retrying", "attempt", attempt, "error", err, "waitTime", waitTime)
+		c.logWarn(req.ctx, "Request failed, retrying", "attempt", attempt, "error", err, "waitTime", waitTime)
 
 		// Don't wait after the last attempt
 		if attempt < config.MaxAttempts {
@@ -392,6 +394,6 @@ func (c *Client) DoWithRetry(req *Request, config *RetryConfig) (*Response, erro
 		}
 	}
 
-	c.logger.Error(req.ctx, "All retry attempts failed", "maxAttempts", config.MaxAttempts, "error", lastErr)
+	c.logError(req.ctx, "All retry attempts failed", "maxAttempts", config.MaxAttempts, "error", lastErr)
 	return nil, fmt.Errorf("all %d retry attempts failed: %w", config.MaxAttempts, lastErr)
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"llm-trading-bot/api"
+	"llm-trading-bot/internal/api"
 )
 
 // NSEDataFetcher fetches earnings data specifically for NSE-listed stocks

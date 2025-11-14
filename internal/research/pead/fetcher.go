@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"llm-trading-bot/api"
+	"llm-trading-bot/internal/api"
 )
 
 // EarningsDataFetcher defines the interface for fetching earnings data from live APIs
