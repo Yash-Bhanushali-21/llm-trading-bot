@@ -2,29 +2,31 @@ package pead
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
+
+	"llm-trading-bot/api"
 )
 
 // NSEDataFetcher fetches earnings data specifically for NSE-listed stocks
 // Uses multiple fallback sources for reliability
 type NSEDataFetcher struct {
-	client         *http.Client
-	yahooFetcher   *YahooFinanceEarningsDataFetcher
-	useYahoo       bool
-	useScreener    bool
+	client       *api.Client
+	yahooFetcher *YahooFinanceEarningsDataFetcher
+	useYahoo     bool
+	useScreener  bool
 }
 
 // NewNSEDataFetcher creates a fetcher optimized for NSE stocks
 func NewNSEDataFetcher() *NSEDataFetcher {
+	// Create API client with longer timeout for NSE APIs
+	client := api.NewClient(
+		api.WithTimeout(45*time.Second),
+	)
+
 	return &NSEDataFetcher{
-		client: &http.Client{
-			Timeout: 45 * time.Second,
-		},
+		client:       client,
 		yahooFetcher: NewYahooFinanceEarningsDataFetcher(),
 		useYahoo:     true,
 		useScreener:  true,
@@ -159,35 +161,12 @@ func (n *NSEDataFetcher) FetchRecentEarningsAnnouncements(ctx context.Context, d
 // fetchNSECorporateAnnouncements fetches recent earnings from NSE corporate actions
 func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, daysBack int) ([]string, error) {
 	// NSE Corporate Announcements endpoint
-	// https://www.nseindia.com/api/corporates-financial-results
-
 	url := "https://www.nseindia.com/api/corporates-financial-results?index=equities"
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NSE request: %w", err)
-	}
-
-	// NSE requires specific headers
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Referer", "https://www.nseindia.com/")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-
-	resp, err := n.client.Do(req)
+	// Make GET request using centralized API client with NSE-specific headers
+	resp, err := n.client.GET(ctx, url, api.NSEHeaders())
 	if err != nil {
 		return nil, fmt.Errorf("NSE API request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("NSE API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read NSE response: %w", err)
 	}
 
 	// Parse NSE response
@@ -199,7 +178,7 @@ func (n *NSEDataFetcher) fetchNSECorporateAnnouncements(ctx context.Context, day
 		} `json:"data"`
 	}
 
-	if err := json.Unmarshal(body, &data); err != nil {
+	if err := resp.ParseJSON(&data); err != nil {
 		return nil, fmt.Errorf("failed to parse NSE response: %w", err)
 	}
 
@@ -263,36 +242,15 @@ func (n *NSEDataFetcher) fetchFromNSEAPI(ctx context.Context, symbol string) (*E
 	// NSE Corporate API endpoint
 	url := fmt.Sprintf("https://www.nseindia.com/api/quote-equity?symbol=%s", symbol)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// NSE requires these specific headers
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Referer", "https://www.nseindia.com/")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-
-	resp, err := n.client.Do(req)
+	// Make GET request using centralized API client with NSE-specific headers
+	resp, err := n.client.GET(ctx, url, api.NSEHeaders())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch from NSE: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("NSE API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read NSE response: %w", err)
 	}
 
 	// Parse NSE response
 	var nseData map[string]interface{}
-	if err := json.Unmarshal(body, &nseData); err != nil {
+	if err := resp.ParseJSON(&nseData); err != nil {
 		return nil, fmt.Errorf("failed to parse NSE response: %w", err)
 	}
 

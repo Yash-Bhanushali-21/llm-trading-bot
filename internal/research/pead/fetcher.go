@@ -2,12 +2,11 @@ package pead
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
+
+	"llm-trading-bot/api"
 )
 
 // EarningsDataFetcher defines the interface for fetching earnings data from live APIs
@@ -21,15 +20,18 @@ type EarningsDataFetcher interface {
 
 // YahooFinanceEarningsDataFetcher fetches real earnings data from Yahoo Finance API
 type YahooFinanceEarningsDataFetcher struct {
-	client *http.Client
+	client *api.Client
 }
 
 // NewYahooFinanceEarningsDataFetcher creates a new Yahoo Finance fetcher
 func NewYahooFinanceEarningsDataFetcher() *YahooFinanceEarningsDataFetcher {
+	// Create API client with Yahoo Finance specific configuration
+	client := api.NewClient(
+		api.WithTimeout(30*time.Second),
+	)
+
 	return &YahooFinanceEarningsDataFetcher{
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client: client,
 	}
 }
 
@@ -74,42 +76,22 @@ func (y *YahooFinanceEarningsDataFetcher) fetchSymbolEarnings(ctx context.Contex
 		yahooSymbol = symbol + ".NS"
 	}
 
-	// Fetch financial data from Yahoo Finance API
+	// Build Yahoo Finance API URL
 	url := fmt.Sprintf("https://query2.finance.yahoo.com/v10/finance/quoteSummary/%s?modules=earnings,financialData,defaultKeyStatistics,earningsHistory", yahooSymbol)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	// Make GET request using centralized API client
+	resp, err := y.client.GET(ctx, url, api.YahooFinanceHeaders())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers to mimic a browser request
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Referer", "https://finance.yahoo.com/")
-
-	resp, err := y.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch data: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to fetch data from Yahoo Finance: %w", err)
 	}
 
 	// Parse the JSON response
 	var yahooResp YahooFinanceResponse
-	if err := json.Unmarshal(body, &yahooResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	if err := resp.ParseJSON(&yahooResp); err != nil {
+		return nil, fmt.Errorf("failed to parse Yahoo Finance response: %w", err)
 	}
 
-	// Extract earnings data
+	// Extract and transform earnings data
 	earningsData, err := y.parseYahooFinanceData(symbol, &yahooResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse earnings data: %w", err)
