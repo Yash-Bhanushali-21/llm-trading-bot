@@ -12,8 +12,9 @@ exchange: NSE
 universe_mode: STATIC   # STATIC | DYNAMIC
 
 # Static universe for quick testing
-universe_static:
-  - RELIANCE
+# Leave empty to enable PEAD discovery across broad NSE universe (200+ stocks)
+# PEAD will scan Nifty 50, Next 50, Midcap, and Smallcap to find sudden earnings growth
+universe_static: []
 
 # Dynamic universe (auto filter)
 universe_dynamic:
@@ -128,6 +129,51 @@ llm:
       "confidence": 0.0_to_1.0,
       "qty": "integer_optional"
     }
+
+# ───────────────────────────────
+# 📈  PEAD RESEARCH MODULE
+# ───────────────────────────────
+pead:
+  enabled: true
+
+  # PEAD time window (days since earnings announcement)
+  min_days_since_earnings: 1
+  max_days_since_earnings: 60    # PEAD effect typically within 60 days
+
+  # Minimum composite score threshold (0-100)
+  # Only companies with this score or higher will qualify
+  min_composite_score: 40         # can be overridden by PEAD_MIN_SCORE in .env
+
+  # Minimum thresholds for individual metrics
+  min_earnings_surprise: 0        # minimum earnings surprise % (can be negative)
+  min_revenue_growth: -10         # minimum YoY revenue growth %
+  min_eps_growth: 0               # minimum YoY EPS growth %
+
+  # NLP enhancement (based on Quantpedia research)
+  enable_nlp: false               # Enable NLP sentiment analysis (experimental)
+
+  # Scoring component weights
+  # NOTE: When enable_nlp=false, traditional weights should sum to 1.0
+  # NOTE: When enable_nlp=true, all weights (including NLP) should sum to 1.0
+  weights:
+    # Traditional PEAD factors (sum = 1.0 when NLP disabled)
+    earnings_surprise: 0.25       # weight for earnings surprise score
+    revenue_surprise: 0.15        # weight for revenue surprise score
+    earnings_growth: 0.20         # weight for YoY EPS growth score
+    revenue_growth: 0.15          # weight for YoY revenue growth score
+    margin_expansion: 0.10        # weight for profit margin expansion score
+    consistency: 0.10             # weight for consecutive beats score
+    revenue_acceleration: 0.05    # weight for QoQ revenue acceleration score
+
+    # NLP-enhanced factors (only used when enable_nlp=true)
+    # When enabling NLP, reduce traditional weights proportionally to fit NLP weights
+    sentiment: 0.00               # weight for overall management sentiment
+    tone_divergence: 0.00         # weight for tone-results alignment
+    linguistic_quality: 0.00      # weight for certainty/clarity/forward-looking
+
+  # Data source configuration
+  data_source: LIVE               # MOCK | LIVE (LIVE uses Yahoo Finance)
+  api_key_env: EARNINGS_API_KEY   # environment variable for API key (not required for Yahoo Finance)
 
 # ───────────────────────────────
 # 📦  LOGGING / FILES
